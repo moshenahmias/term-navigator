@@ -39,9 +39,14 @@ func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) App {
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 
+	left := NewPane(leftExp, half, height)
+	right := NewPane(rightExp, half, height)
+
+	left.SetActive(true)
+
 	return App{
-		left:        NewPane(leftExp, half, height),
-		right:       NewPane(rightExp, half, height),
+		left:        left,
+		right:       right,
 		focus:       0,
 		renameInput: ti,
 	}
@@ -94,6 +99,8 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "tab":
 			a.focus = 1 - a.focus
+			a.left.SetActive(a.focus == 0)
+			a.right.SetActive(a.focus == 1)
 			return a, nil
 
 		case "enter":

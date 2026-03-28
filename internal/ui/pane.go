@@ -16,6 +16,7 @@ import (
 type ncDelegate struct {
 	normalStyle   lipgloss.Style
 	selectedStyle lipgloss.Style
+	active        bool
 }
 
 func (d ncDelegate) Height() int  { return 1 }
@@ -41,19 +42,16 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 	selected := index == m.Index()
 
 	var style lipgloss.Style
-	if selected {
+	if selected && d.active {
 		style = d.selectedStyle
 	} else {
 		style = d.normalStyle
 	}
 
 	line := fi.Title()
-
 	if fi.Info.IsSymlink {
 		line += " ↪"
 	}
-
-	//line = padToWidth(line, m.Width())
 
 	fmt.Fprint(w, style.Render(line))
 }
@@ -81,17 +79,16 @@ type Pane struct {
 	width            int
 	height           int
 	lastSelectedPath string
+	delegate         *ncDelegate
 }
 
 func NewPane(exp explorer.FileExplorer, width, height int) Pane {
 	// Create delegate with NC styles
 	d := ncDelegate{
 		normalStyle: lipgloss.NewStyle().
-			//PaddingLeft(3).
 			Foreground(lipgloss.Color("#FFFFFF")),
 
 		selectedStyle: lipgloss.NewStyle().
-			//PaddingLeft(3).
 			Foreground(lipgloss.Color("#000000")). // black text
 			Background(lipgloss.Color("#FFFFFF")). // white background
 			Bold(true),
@@ -116,6 +113,7 @@ func NewPane(exp explorer.FileExplorer, width, height int) Pane {
 		list:     l,
 		width:    width,
 		height:   height,
+		delegate: &d,
 	}
 
 	p.refresh()
@@ -217,7 +215,7 @@ func (p *Pane) Resize(width, height int) {
 	p.height = height
 
 	// list must be smaller than pane so border has room
-	p.list.SetSize(width, height-2)
+	p.list.SetSize(width, height-3)
 }
 
 func (p *Pane) SelectedItem() (FileItem, bool) {
@@ -228,4 +226,13 @@ func (p *Pane) SelectedItem() (FileItem, bool) {
 
 	fi, ok := item.(FileItem)
 	return fi, ok
+}
+
+func (p *Pane) SetActive(active bool) {
+	p.delegate.active = active
+	p.list.SetDelegate(*p.delegate)
+
+	// 🔥 Re-apply styles so help/status/title don't disappear
+	styles := list.DefaultStyles(true)
+	p.list.Styles = styles
 }
