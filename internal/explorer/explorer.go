@@ -29,4 +29,5 @@ type FileExplorer interface {
 
 	Delete(path string) error
 	Mkdir(path string) error
+	Rename(oldPath, newPath string) error
 }

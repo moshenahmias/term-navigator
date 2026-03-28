@@ -166,3 +166,17 @@ func (l *LocalExplorer) Mkdir(path string) error {
 	}
 	return os.MkdirAll(abs, 0755)
 }
+
+func (l *LocalExplorer) Rename(oldPath, newPath string) error {
+	absOld := oldPath
+	if !filepath.IsAbs(oldPath) {
+		absOld = filepath.Join(l.cwd, oldPath)
+	}
+
+	absNew := newPath
+	if !filepath.IsAbs(newPath) {
+		absNew = filepath.Join(l.cwd, newPath)
+	}
+
+	return os.Rename(absOld, absNew)
+}

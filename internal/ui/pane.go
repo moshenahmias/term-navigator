@@ -52,7 +52,7 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 		line += " ↪"
 	}
 
-	line = padToWidth(line, m.Width())
+	//line = padToWidth(line, m.Width())
 
 	fmt.Fprint(w, style.Render(line))
 }
@@ -61,24 +61,36 @@ type FileItem struct {
 	Info explorer.FileInfo
 }
 
-func (f FileItem) Title() string       { return f.Info.Name }
+func (f FileItem) Title() string {
+	name := f.Info.Name
+
+	if f.Info.IsDir && name != ".." {
+		return name + "/"
+	}
+
+	return name
+}
+
 func (f FileItem) Description() string { return "" }
 func (f FileItem) FilterValue() string { return f.Info.Name }
 
 type Pane struct {
-	explorer explorer.FileExplorer
-	list     list.Model
-	width    int
-	height   int
+	explorer         explorer.FileExplorer
+	list             list.Model
+	width            int
+	height           int
+	lastSelectedPath string
 }
 
 func NewPane(exp explorer.FileExplorer, width, height int) Pane {
 	// Create delegate with NC styles
 	d := ncDelegate{
 		normalStyle: lipgloss.NewStyle().
+			//PaddingLeft(3).
 			Foreground(lipgloss.Color("#FFFFFF")),
 
 		selectedStyle: lipgloss.NewStyle().
+			//PaddingLeft(3).
 			Foreground(lipgloss.Color("#000000")). // black text
 			Background(lipgloss.Color("#FFFFFF")). // white background
 			Bold(true),
@@ -118,23 +130,43 @@ func (p *Pane) refresh() {
 
 	li := make([]list.Item, 0, len(items)+1)
 
+	selectedIndex := 0 // default to first item
+
 	// Add ".." only if not at filesystem root
 	if p.explorer.Cwd() != "/" {
-		li = append(li, FileItem{
+		upItem := FileItem{
 			Info: explorer.FileInfo{
 				Name:     "..",
 				FullPath: "..",
 				IsDir:    true,
 			},
-		})
+		}
+
+		li = append(li, upItem)
+
+		// If renamed item is ".." (unlikely), match here
+		if p.lastSelectedPath == ".." {
+			selectedIndex = 0
+		}
 	}
 
-	for _, fi := range items {
-		li = append(li, FileItem{Info: fi})
+	// Add real items
+	for i, fi := range items {
+		item := FileItem{Info: fi}
+		li = append(li, item)
+
+		// 🔥 If this item matches the renamed path, remember its index
+		if p.lastSelectedPath != "" && fi.FullPath == p.lastSelectedPath {
+			// +1 because ".." shifts everything down
+			selectedIndex = i + 1
+		}
 	}
 
 	p.list.SetItems(li)
-	p.list.Title = p.explorer.Cwd()
+	p.list.Select(selectedIndex)
+
+	// Clear remembered path
+	p.lastSelectedPath = ""
 }
 
 func (p Pane) Init() tea.Cmd { return nil }
@@ -146,10 +178,11 @@ func (p Pane) Update(msg tea.Msg) (Pane, tea.Cmd) {
 }
 
 func (p Pane) View() string {
-	header := padToWidth(p.explorer.Cwd(), p.width)
-	header = lipgloss.NewStyle().
+	//header := padToWidth(p.explorer.Cwd(), p.width)
+
+	header := lipgloss.NewStyle().
 		Bold(true).
-		Render(header)
+		Render(p.explorer.Cwd())
 
 	body := p.list.View()
 
@@ -171,4 +204,14 @@ func (p *Pane) Resize(width, height int) {
 
 	// list must be smaller than pane so border has room
 	p.list.SetSize(width, height-2)
+}
+
+func (p *Pane) SelectedItem() (FileItem, bool) {
+	item := p.list.SelectedItem()
+	if item == nil {
+		return FileItem{}, false
+	}
+
+	fi, ok := item.(FileItem)
+	return fi, ok
 }

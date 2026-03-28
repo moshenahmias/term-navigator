@@ -2,10 +2,12 @@ package ui
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 
 	"github.com/moshenahmias/term-navigator/internal/explorer"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"charm.land/lipgloss/v2"
@@ -23,23 +25,53 @@ var (
 )
 
 type App struct {
-	left  Pane
-	right Pane
-	focus int // 0 = left, 1 = right
+	left        Pane
+	right       Pane
+	focus       int // 0 = left, 1 = right
+	renaming    bool
+	renameInput textinput.Model
 }
 
 func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) App {
 	half := width / 2
+	ti := textinput.New()
+	ti.Placeholder = "New name"
+	ti.CharLimit = 256
+	ti.SetWidth(40)
+
 	return App{
-		left:  NewPane(leftExp, half, height),
-		right: NewPane(rightExp, half, height),
-		focus: 0,
+		left:        NewPane(leftExp, half, height),
+		right:       NewPane(rightExp, half, height),
+		focus:       0,
+		renameInput: ti,
 	}
 }
 
 func (a App) Init() tea.Cmd { return nil }
 
-func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	a.renameInput, cmd = a.renameInput.Update(msg)
+
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		switch m.String() {
+		case "enter":
+			a.applyRename()
+			a.renaming = false
+			return a, nil
+
+		case "esc":
+			a.renaming = false
+			return a, nil
+		}
+	}
+
+	// 🔥 IMPORTANT: return here so pane does NOT update
+	return a, cmd
+}
+
+func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -86,7 +118,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := active.explorer.Chdir(parent); err == nil {
 				active.refresh()
 			}
+		case "f2": // rename
+			pane := a.activePane()
+			item, ok := pane.SelectedItem()
+			if !ok {
+				return a, nil
+			}
 
+			a.renaming = true
+			a.renameInput.SetValue(item.Info.Name)
+			a.renameInput.Focus()
+
+			return a, nil
 		}
 	}
 
@@ -102,42 +145,67 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
+func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if a.renaming {
+		return a.updateRename(msg)
+	}
+
+	return a.updateMain(msg)
+}
+
 func (a App) View() tea.View {
-	left := ncPaneStyle.
-		Width(a.left.width).
-		Height(a.left.height).
-		MaxHeight(a.left.height).
-		Padding(0).
-		Align(lipgloss.Top).
+	// 1. Render pane content with height constraint (subtract borders)
+	leftContent := lipgloss.NewStyle().
+		MaxHeight(a.left.height - 2).
 		Render(a.left.View())
 
-	right := ncPaneStyle.
-		Width(a.right.width).
-		Height(a.right.height).
-		MaxHeight(a.right.height).
-		Padding(0).
-		Align(lipgloss.Top).
+	rightContent := lipgloss.NewStyle().
+		MaxHeight(a.right.height - 2).
 		Render(a.right.View())
 
-	leftBox := ncBorder.Render(left)
-	rightBox := ncBorder.Render(right)
+	// 2. Wrap content in border
+	leftBox := ncBorder.
+		Width(a.left.width).
+		Height(a.left.height).
+		Render(leftContent)
 
+	rightBox := ncBorder.
+		Width(a.right.width).
+		Height(a.right.height).
+		Render(rightContent)
+
+	// 3. Join horizontally
 	panes := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftBox,
 		rightBox,
 	)
 
+	// 4. Rename mode
+	if a.renaming {
+		renameBox := lipgloss.JoinVertical(
+			lipgloss.Left,
+			panes,
+			"Rename:",
+			a.renameInput.View(),
+		)
+		v := tea.NewView(renameBox)
+		v.AltScreen = true // 🔥 use alternate screen
+		return v
+	}
+
+	// 5. Footer
 	footer := a.commandBar()
 
-	// Join vertically: panes above, footer below
 	out := lipgloss.JoinVertical(
 		lipgloss.Left,
 		panes,
 		footer,
 	)
 
-	return tea.NewView(out)
+	v := tea.NewView(out)
+	v.AltScreen = true // 🔥 use alternate screen
+	return v
 }
 
 func (a *App) activePane() *Pane {
@@ -177,4 +245,33 @@ func (a App) commandBar() string {
 		Foreground(lipgloss.Color("#ccc")).
 		Padding(0, 1).
 		Render(footer)
+}
+
+func (a *App) applyRename() {
+	pane := a.activePane()
+
+	fi, ok := pane.SelectedItem()
+	if !ok {
+		return
+	}
+
+	newName := a.renameInput.Value()
+	if newName == "" || newName == fi.Info.Name {
+		return
+	}
+
+	// Compute new path/key
+	oldPath := fi.Info.FullPath
+	newPath := path.Join(path.Dir(oldPath), newName)
+
+	// Perform backend rename
+	if err := pane.explorer.Rename(oldPath, newPath); err != nil {
+		// TODO: show error in status bar
+		return
+	}
+
+	pane.lastSelectedPath = newPath
+
+	// Refresh pane contents
+	pane.refresh()
 }
