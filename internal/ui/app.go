@@ -68,10 +68,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			info, err := pane.Selected()
-			if err == nil && info.IsDir {
+			if err == nil && (info.IsDir || info.IsSymlinkToDir) {
 				pane.explorer.Chdir(info.FullPath)
 				pane.refresh()
 			}
+
 			return a, nil
 		}
 	}

@@ -50,19 +50,36 @@ func (l *LocalExplorer) List() ([]explorer.FileInfo, error) {
 
 	out := make([]explorer.FileInfo, 0, len(entries))
 	for _, e := range entries {
-		fi, err := e.Info()
+		full := filepath.Join(l.cwd, e.Name())
+
+		lstat, err := os.Lstat(full)
 		if err != nil {
 			continue
 		}
 
+		isSymlink := lstat.Mode()&os.ModeSymlink != 0
+		isDir := e.IsDir() // this follows symlink, but we’ll fix below
+
+		isSymlinkToDir := false
+		if isSymlink {
+			// follow the symlink
+			target, err := os.Stat(full)
+			if err == nil && target.IsDir() {
+				isSymlinkToDir = true
+				isDir = true // treat symlink-to-dir as a directory
+			}
+		}
+
 		out = append(out, explorer.FileInfo{
-			Name:     e.Name(),
-			FullPath: filepath.Join(l.cwd, e.Name()),
-			IsDir:    e.IsDir(),
-			Size:     fi.Size(),
-			Modified: fi.ModTime(),
-			Extra:    nil,
+			Name:           e.Name(),
+			FullPath:       full,
+			IsDir:          isDir,
+			Size:           lstat.Size(),
+			Modified:       lstat.ModTime(),
+			IsSymlink:      isSymlink,
+			IsSymlinkToDir: isSymlinkToDir,
 		})
+
 	}
 
 	return out, nil
@@ -79,13 +96,24 @@ func (l *LocalExplorer) Stat(path string) (explorer.FileInfo, error) {
 		return explorer.FileInfo{}, err
 	}
 
+	isSymlink := fi.Mode()&os.ModeSymlink != 0
+	isSymlinkToDir := false
+	if isSymlink {
+		target, err := os.Stat(path) // follows symlink
+		if err == nil && target.IsDir() {
+			isSymlinkToDir = true
+		}
+	}
+
 	return explorer.FileInfo{
-		Name:     filepath.Base(abs),
-		FullPath: abs,
-		IsDir:    fi.IsDir(),
-		Size:     fi.Size(),
-		Modified: fi.ModTime(),
-		Extra:    nil,
+		Name:           filepath.Base(abs),
+		FullPath:       abs,
+		IsDir:          fi.IsDir(),
+		Size:           fi.Size(),
+		Modified:       fi.ModTime(),
+		Extra:          nil,
+		IsSymlink:      isSymlink,
+		IsSymlinkToDir: isSymlinkToDir,
 	}, nil
 }
 

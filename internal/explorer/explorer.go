@@ -6,12 +6,14 @@ import (
 )
 
 type FileInfo struct {
-	Name     string
-	FullPath string
-	IsDir    bool
-	Size     int64
-	Modified time.Time
-	Extra    map[string]any
+	Name           string
+	FullPath       string
+	IsDir          bool
+	Size           int64
+	Modified       time.Time
+	Extra          map[string]any
+	IsSymlink      bool
+	IsSymlinkToDir bool
 }
 
 type FileExplorer interface {

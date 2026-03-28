@@ -46,7 +46,14 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 		style = d.normalStyle
 	}
 
-	line := padToWidth(fi.Title(), m.Width())
+	line := fi.Title()
+
+	if fi.Info.IsSymlink {
+		line += " ↪"
+	}
+
+	line = padToWidth(line, m.Width())
+
 	fmt.Fprint(w, style.Render(line))
 }
 
