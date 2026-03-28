@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/moshenahmias/term-navigator/internal/explorer"
@@ -127,6 +128,19 @@ func (p *Pane) refresh() {
 		p.list.SetItems([]list.Item{})
 		return
 	}
+
+	sort.Slice(items, func(i, j int) bool {
+		a := items[i]
+		b := items[j]
+
+		// Directories first
+		if a.IsDir != b.IsDir {
+			return a.IsDir
+		}
+
+		// Then alphabetical
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	})
 
 	li := make([]list.Item, 0, len(items)+1)
 

@@ -79,7 +79,7 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		totalHeight := msg.Height
 
 		// subtract 2 columns for each pane border
-		paneWidth := (totalWidth / 2) - 2
+		paneWidth := (totalWidth / 2)
 
 		// subtract 2 rows for top/bottom border
 		paneHeight := totalHeight - 2
