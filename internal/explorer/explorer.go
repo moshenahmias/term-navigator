@@ -1,0 +1,30 @@
+package explorer
+
+import (
+	"io"
+	"time"
+)
+
+type FileInfo struct {
+	Name     string
+	FullPath string
+	IsDir    bool
+	Size     int64
+	Modified time.Time
+	Extra    map[string]any
+}
+
+type FileExplorer interface {
+	Cwd() string
+	Chdir(path string) error
+
+	List() ([]FileInfo, error)
+	Stat(path string) (FileInfo, error)
+	Exists(path string) bool
+
+	Read(path string) (io.ReadCloser, error)
+	Write(path string, r io.Reader) error
+
+	Delete(path string) error
+	Mkdir(path string) error
+}
