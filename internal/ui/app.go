@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/moshenahmias/term-navigator/internal/explorer"
 
@@ -76,6 +77,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return a, nil
+		case "backspace":
+			active := a.activePane() // left or right
+			cwd := active.explorer.Cwd()
+
+			parent := filepath.Dir(cwd)
+
+			if err := active.explorer.Chdir(parent); err == nil {
+				active.refresh()
+			}
+
 		}
 	}
 
@@ -129,8 +140,17 @@ func (a App) View() tea.View {
 	return tea.NewView(out)
 }
 
+func (a *App) activePane() *Pane {
+	if a.focus == 0 {
+		return &a.left
+	}
+	return &a.right
+}
+
 func (a App) commandBar() string {
-	key := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00afff"))
+	key := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00afff"))
 
 	copyTarget := "Right"
 	moveTarget := "Right"
