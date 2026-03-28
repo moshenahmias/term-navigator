@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"github.com/moshenahmias/term-navigator/internal/explorer"
 
 	tea "charm.land/bubbletea/v2"
@@ -109,11 +111,50 @@ func (a App) View() tea.View {
 	leftBox := ncBorder.Render(left)
 	rightBox := ncBorder.Render(right)
 
-	out := lipgloss.JoinHorizontal(
+	panes := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftBox,
 		rightBox,
 	)
 
+	footer := a.commandBar()
+
+	// Join vertically: panes above, footer below
+	out := lipgloss.JoinVertical(
+		lipgloss.Left,
+		panes,
+		footer,
+	)
+
 	return tea.NewView(out)
+}
+
+func (a App) commandBar() string {
+	key := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00afff"))
+
+	copyTarget := "Right"
+	moveTarget := "Right"
+	if a.focus == 1 {
+		copyTarget = "Left"
+		moveTarget = "Left"
+	}
+
+	footer := fmt.Sprintf(
+		"%s Help   %s Rename   %s View   %s Edit   %s Copy→%s   %s Move→%s   %s Mkdir   %s Delete   %s Quit",
+		key.Render("F1"),
+		key.Render("F2"),
+		key.Render("F3"),
+		key.Render("F4"),
+		key.Render("F5"), copyTarget,
+		key.Render("F6"), moveTarget,
+		key.Render("F7"),
+		key.Render("F8"),
+		key.Render("F10"),
+	)
+
+	return lipgloss.NewStyle().
+		Background(lipgloss.Color("#222")).
+		Foreground(lipgloss.Color("#ccc")).
+		Padding(0, 1).
+		Render(footer)
 }
