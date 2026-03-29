@@ -36,6 +36,7 @@ const (
 	inputMkdir
 	inputConfirmDelete
 	inputConfirmCopy
+	inputConfirmMove
 )
 
 type inputSettings struct {
@@ -48,6 +49,7 @@ var inputText = map[inputMode]inputSettings{
 	inputMkdir:         {text: "New directory name:", placeholder: "Directory name"},
 	inputConfirmDelete: {text: "Type DELETE to confirm:", placeholder: "DELETE"},
 	inputConfirmCopy:   {text: "Type COPY to confirm:", placeholder: "COPY"},
+	inputConfirmMove:   {text: "Type MOVE to confirm:", placeholder: "MOVE"},
 }
 
 var _ tea.Model = (*App)(nil)
@@ -107,6 +109,8 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.applyDelete()
 			case inputConfirmCopy:
 				return a, a.applyCopy()
+			case inputConfirmMove:
+				return a, a.applyMove()
 			}
 
 			return a, nil
@@ -189,6 +193,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runEdit()
 		case "f5":
 			return a.runCopy()
+		case "f6":
+			return a.runMove()
 		case "f7":
 			return a.runMakeDir()
 		case "f8":
@@ -435,11 +441,7 @@ func (a *App) applyCopy() tea.Cmd {
 	}
 
 	item, ok := src.SelectedItem()
-	if !ok || (item.Info.IsDir && item.Info.Name == "..") || item.Info.IsSymlinkToDir {
-		return nil
-	}
-
-	if !item.isCopyable() {
+	if !ok || !item.isCopyable() {
 		return nil
 	}
 
@@ -479,6 +481,73 @@ func (a *App) applyCopy() tea.Cmd {
 		}
 
 		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", item.Info.FullPath, dstPath))
+	}
+}
+
+func (a *App) applyMove() tea.Cmd {
+	src := a.activePane()
+
+	// pick destination pane
+	dst := &a.left
+	if src == &a.left {
+		dst = &a.right
+	}
+
+	if src.explorer.Cwd() == dst.explorer.Cwd() {
+		return func() tea.Msg {
+			return a.newErrorMsg("Source and destination are the same")
+		}
+	}
+
+	item, ok := src.SelectedItem()
+	if !ok || !item.isMoveable() {
+		return nil
+	}
+
+	if a.textbox.Value() != "MOVE" {
+		return func() tea.Msg {
+			return a.newErrorMsg("confirmation text does not match")
+		}
+	}
+
+	return func() tea.Msg {
+		// 1. Download from source backend
+		handle, err := src.explorer.Download(item.Info.FullPath)
+		if err != nil {
+			return a.newErrorMsg("Move failed: " + err.Error())
+		}
+
+		// We will collect ALL errors here
+		var errs []string
+
+		// 2. Upload to destination backend
+		dstPath := path.Join(dst.explorer.Cwd(), item.Info.Name)
+		if err := dst.explorer.UploadFrom(handle.Path(), dstPath); err != nil {
+			errs = append(errs, "Move failed: "+err.Error())
+		}
+
+		// 3. Always close the handle, even if upload failed
+		if err := handle.Close(); err != nil {
+			errs = append(errs, "Cleanup failed: "+err.Error())
+		}
+
+		// 4. Attempt to delete source (only if download/upload succeeded)
+		if len(errs) == 0 {
+			if err := src.explorer.Delete(item.Info.FullPath); err != nil {
+				errs = append(errs, "Delete failed: "+err.Error())
+			}
+		}
+
+		// 5. Refresh both panes that show the source and destination directories
+		a.refreshPanesForPath(src.explorer.Cwd())
+		a.refreshPanesForPath(dst.explorer.Cwd())
+
+		// 6. If any errors occurred, show them
+		if len(errs) > 0 {
+			return a.newErrorMsg(strings.Join(errs, " | "))
+		}
+
+		return a.newStatusMsg(fmt.Sprintf("Moved %q to %q", item.Info.FullPath, dstPath))
 	}
 }
 
@@ -555,6 +624,17 @@ func (a *App) runCopy() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	if item, ok := pane.SelectedItem(); ok && item.isCopyable() {
 		a.inputMode = inputConfirmCopy
+		a.textbox.SetValue("")
+		a.textbox.Focus()
+	}
+
+	return a, nil
+}
+
+func (a *App) runMove() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	if item, ok := pane.SelectedItem(); ok && item.isMoveable() {
+		a.inputMode = inputConfirmMove
 		a.textbox.SetValue("")
 		a.textbox.Focus()
 	}
