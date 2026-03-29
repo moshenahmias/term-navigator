@@ -312,23 +312,65 @@ func (a *App) commandBar() string {
 		Bold(true).
 		Foreground(lipgloss.Color("#00afff"))
 
-	copyTarget := "Right"
-	moveTarget := "Right"
+	greyed := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#555555"))
+
+	copyTarget := "Copy→Right"
+	moveTarget := "Move→Right"
 	if a.focus == 1 {
-		copyTarget = "Left"
-		moveTarget = "Left"
+		copyTarget = "Left←Copy"
+		moveTarget = "Left←Move"
 	}
 
+	item, itemSelected := a.activePane().SelectedItem()
+
 	footer := fmt.Sprintf(
-		"%s Help   %s Rename   %s View   %s Edit   %s Copy→%s   %s Move→%s   %s Mkdir   %s Delete   %s Quit",
+		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Quit",
 		key.Render("F1"),
-		key.Render("F2"),
-		key.Render("F3"),
-		key.Render("F4"),
-		key.Render("F5"), copyTarget,
-		key.Render("F6"), moveTarget,
+		func() lipgloss.Style {
+			if itemSelected && item.isRenamable() {
+				return key
+			}
+
+			return greyed
+		}().Render("F2"),
+		func() lipgloss.Style {
+			if itemSelected && item.isViewable() {
+				return key
+			}
+
+			return greyed
+		}().Render("F3"),
+		func() lipgloss.Style {
+			if itemSelected && item.isEditable() {
+				return key
+			}
+
+			return greyed
+		}().Render("F4"),
+		func() lipgloss.Style {
+			if itemSelected && item.isCopyable() {
+				return key
+			}
+
+			return greyed
+		}().Render("F5"), copyTarget,
+		func() lipgloss.Style {
+			if itemSelected && item.isMoveable() {
+				return key
+			}
+
+			return greyed
+		}().Render("F6"), moveTarget,
 		key.Render("F7"),
-		key.Render("F8"),
+		func() lipgloss.Style {
+			if itemSelected && item.isDeleteable() {
+				return key
+			}
+
+			return greyed
+		}().Render("F8"),
 		key.Render("F10"),
 	)
 

@@ -83,6 +83,10 @@ func (f *FileItem) isCopyable() bool {
 	return !f.Info.IsDir || f.Info.Name != ".."
 }
 
+func (f *FileItem) isMoveable() bool {
+	return !f.Info.IsDir || f.Info.Name != ".."
+}
+
 func (f *FileItem) isViewable() bool {
 	return !f.Info.IsDir
 }
