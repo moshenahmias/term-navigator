@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"path"
@@ -34,19 +35,41 @@ type statusMsg struct {
 
 type clearStatusMsg struct{}
 
+type inputMode int
+
+const (
+	inputNone inputMode = iota
+	inputRename
+	inputMkdir
+	inputConfirmDelete
+)
+
+type inputSettings struct {
+	text        string
+	placeholder string
+}
+
+var inputText = map[inputMode]inputSettings{
+	inputRename:        {text: "Rename:", placeholder: "New name"},
+	inputMkdir:         {text: "New directory name:", placeholder: "Directory name"},
+	inputConfirmDelete: {text: "Type DELETE to confirm:", placeholder: "DELETE"},
+}
+
+var _ tea.Model = (*App)(nil)
+
 type App struct {
-	left        Pane
-	right       Pane
-	focus       int // 0 = left, 1 = right
-	renaming    bool
-	renameInput textinput.Model
-	msg         statusMsg
+	left      Pane
+	right     Pane
+	focus     int // 0 = left, 1 = right
+	textbox   textinput.Model
+	inputMode inputMode
+
+	msg statusMsg
 }
 
 func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) *App {
 	half := width / 2
 	ti := textinput.New()
-	ti.Placeholder = "New name"
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 
@@ -56,34 +79,60 @@ func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) *App {
 	left.SetActive(true)
 
 	return &App{
-		left:        left,
-		right:       right,
-		focus:       0,
-		renameInput: ti,
+		left:    left,
+		right:   right,
+		focus:   0,
+		textbox: ti,
 	}
 }
 
 func (a *App) Init() tea.Cmd { return nil }
 
-func (a *App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	a.renameInput, cmd = a.renameInput.Update(msg)
+	a.textbox, cmd = a.textbox.Update(msg)
 
 	switch m := msg.(type) {
 	case tea.KeyMsg:
 		switch m.String() {
 		case "enter":
-			a.renaming = false
-			if err := a.applyRename(); err != nil {
+			currentInput := a.inputMode
+			a.inputMode = inputNone
+
+			switch currentInput {
+			case inputRename:
+				if err := a.applyRename(); err != nil {
+					return a, func() tea.Msg {
+						return a.newErrorMsg("Rename failed: " + err.Error())
+					}
+				}
 				return a, func() tea.Msg {
-					return a.newErrorMsg("Rename failed: " + err.Error())
+					return a.newStatusMsg("Rename successful")
+				}
+			case inputMkdir:
+				if err := a.applyMakeDir(); err != nil {
+					return a, func() tea.Msg {
+						return a.newErrorMsg("Create directory failed: " + err.Error())
+					}
+				}
+				return a, func() tea.Msg {
+					return a.newStatusMsg("Directory created successfully")
+				}
+			case inputConfirmDelete:
+				if err := a.applyDelete(); err != nil {
+					return a, func() tea.Msg {
+						return a.newErrorMsg("Delete failed: " + err.Error())
+					}
+				}
+				return a, func() tea.Msg {
+					return a.newStatusMsg("Deleted successfully")
 				}
 			}
 
 			return a, nil
 
 		case "esc":
-			a.renaming = false
+			a.inputMode = inputNone
 			return a, nil
 		}
 	}
@@ -160,7 +209,10 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runEdit()
 		case "f5":
 			return a.runCopy()
-
+		case "f7":
+			return a.runMakeDir()
+		case "f8":
+			return a.runDelete()
 		case "f10":
 			return a, tea.Quit
 
@@ -180,8 +232,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if a.renaming {
-		return a.updateRename(msg)
+	if a.inputMode != inputNone {
+		return a.updateInput(msg)
 	}
 
 	return a.updateMain(msg)
@@ -234,15 +286,16 @@ func (a *App) View() tea.View {
 		rightBox,
 	)
 
-	// 4. Rename mode
-	if a.renaming {
-		renameBox := lipgloss.JoinVertical(
+	// 4. Input mode
+	if a.inputMode != inputNone {
+		a.textbox.Placeholder = inputText[a.inputMode].placeholder
+		inputBox := lipgloss.JoinVertical(
 			lipgloss.Left,
 			panes,
-			"Rename:",
-			a.renameInput.View(),
+			inputText[a.inputMode].text,
+			a.textbox.View(),
 		)
-		v := tea.NewView(renameBox)
+		v := tea.NewView(inputBox)
 		v.AltScreen = true
 		return v
 	}
@@ -314,7 +367,7 @@ func (a *App) applyRename() error {
 		return nil
 	}
 
-	newName := a.renameInput.Value()
+	newName := a.textbox.Value()
 	if newName == "" || newName == fi.Info.Name {
 		return nil
 	}
@@ -336,6 +389,41 @@ func (a *App) applyRename() error {
 	return nil
 }
 
+func (a *App) applyMakeDir() error {
+	active := a.activePane()
+	newDirPath := path.Join(active.explorer.Cwd(), a.textbox.Value())
+
+	if err := active.explorer.Mkdir(newDirPath); err != nil {
+		return err
+	}
+
+	// Refresh both panes that show this directory
+	a.refreshPanesForPath(active.explorer.Cwd())
+
+	return nil
+}
+
+func (a *App) applyDelete() error {
+	pane := a.activePane()
+	item, ok := pane.SelectedItem()
+	if !ok {
+		return nil
+	}
+
+	if a.textbox.Value() != "DELETE" {
+		return errors.New("confirmation text does not match")
+	}
+
+	if err := pane.explorer.Delete(item.Info.FullPath); err != nil {
+		return err
+	}
+
+	// Refresh both panes that show this directory
+	a.refreshPanesForPath(pane.explorer.Cwd())
+
+	return nil
+}
+
 func (a *App) newErrorMsg(text string) tea.Msg {
 	return statusMsg{text: text, isErr: true}
 }
@@ -344,17 +432,31 @@ func (a *App) newStatusMsg(text string) tea.Msg {
 	return statusMsg{text: text, isErr: false}
 }
 
-func (a *App) clearStatus() tea.Msg {
-	return statusMsg{}
-}
-
 func (a *App) runRename() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	if item, ok := pane.SelectedItem(); ok {
-		a.renaming = true
-		a.renameInput.SetValue(item.Info.Name)
-		a.renameInput.Focus()
+		a.inputMode = inputRename
+		a.textbox.SetValue(item.Info.Name)
+		a.textbox.Focus()
+	}
 
+	return a, nil
+}
+
+func (a *App) runMakeDir() (tea.Model, tea.Cmd) {
+	a.inputMode = inputMkdir
+	a.textbox.SetValue("New Folder")
+	a.textbox.Focus()
+
+	return a, nil
+}
+
+func (a *App) runDelete() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	if _, ok := pane.SelectedItem(); ok {
+		a.inputMode = inputConfirmDelete
+		a.textbox.SetValue("")
+		a.textbox.Focus()
 	}
 
 	return a, nil
