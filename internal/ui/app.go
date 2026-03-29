@@ -493,6 +493,7 @@ func (a *App) applyMakeDir() tea.Cmd {
 	}
 
 	// Refresh both panes that show this directory
+	active.lastSelectedPath = newDirPath
 	a.refreshPanesForPath(active.explorer.Cwd())
 
 	return func() tea.Msg {
@@ -656,6 +657,11 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 		if len(errs) > 0 {
 			return a.newErrorMsg(strings.Join(errs, " | "))
 		}
+
+		pane.lastSelectedPath = item.Info.FullPath
+
+		// Refresh both panes that show this directory
+		a.refreshPanesForPath(pane.explorer.Cwd())
 
 		return nil
 	})
