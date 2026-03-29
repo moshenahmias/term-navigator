@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"errors"
 	"fmt"
 	"os/exec"
 	"path"
@@ -42,6 +41,7 @@ const (
 	inputRename
 	inputMkdir
 	inputConfirmDelete
+	inputConfirmCopy
 )
 
 type inputSettings struct {
@@ -53,6 +53,7 @@ var inputText = map[inputMode]inputSettings{
 	inputRename:        {text: "Rename:", placeholder: "New name"},
 	inputMkdir:         {text: "New directory name:", placeholder: "Directory name"},
 	inputConfirmDelete: {text: "Type DELETE to confirm:", placeholder: "DELETE"},
+	inputConfirmCopy:   {text: "Type COPY to confirm:", placeholder: "COPY"},
 }
 
 var _ tea.Model = (*App)(nil)
@@ -101,32 +102,13 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch currentInput {
 			case inputRename:
-				if err := a.applyRename(); err != nil {
-					return a, func() tea.Msg {
-						return a.newErrorMsg("Rename failed: " + err.Error())
-					}
-				}
-				return a, func() tea.Msg {
-					return a.newStatusMsg("Rename successful")
-				}
+				return a, a.applyRename()
 			case inputMkdir:
-				if err := a.applyMakeDir(); err != nil {
-					return a, func() tea.Msg {
-						return a.newErrorMsg("Create directory failed: " + err.Error())
-					}
-				}
-				return a, func() tea.Msg {
-					return a.newStatusMsg("Directory created successfully")
-				}
+				return a, a.applyMakeDir()
 			case inputConfirmDelete:
-				if err := a.applyDelete(); err != nil {
-					return a, func() tea.Msg {
-						return a.newErrorMsg("Delete failed: " + err.Error())
-					}
-				}
-				return a, func() tea.Msg {
-					return a.newStatusMsg("Deleted successfully")
-				}
+				return a, a.applyDelete()
+			case inputConfirmCopy:
+				return a, a.applyCopy()
 			}
 
 			return a, nil
@@ -359,7 +341,7 @@ func (a *App) commandBar() string {
 		Render(footer)
 }
 
-func (a *App) applyRename() error {
+func (a *App) applyRename() tea.Cmd {
 	pane := a.activePane()
 
 	fi, ok := pane.SelectedItem()
@@ -378,7 +360,9 @@ func (a *App) applyRename() error {
 
 	// Perform backend rename
 	if err := pane.explorer.Rename(oldPath, newPath); err != nil {
-		return err
+		return func() tea.Msg {
+			return a.newErrorMsg("Rename failed: " + err.Error())
+		}
 	}
 
 	pane.lastSelectedPath = newPath
@@ -386,24 +370,89 @@ func (a *App) applyRename() error {
 	// Refresh both panes that show this directory
 	a.refreshPanesForPath(filepath.Dir(oldPath))
 
-	return nil
+	return func() tea.Msg {
+		return a.newStatusMsg(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
+	}
 }
 
-func (a *App) applyMakeDir() error {
+func (a *App) applyCopy() tea.Cmd {
+	src := a.activePane()
+
+	// pick destination pane
+	dst := &a.left
+	if src == &a.left {
+		dst = &a.right
+	}
+
+	if src.explorer.Cwd() == dst.explorer.Cwd() {
+		return func() tea.Msg {
+			return a.newErrorMsg("Source and destination are the same")
+		}
+	}
+
+	item, ok := src.SelectedItem()
+	if !ok || (item.Info.IsDir && item.Info.Name == "..") || item.Info.IsSymlinkToDir {
+		return nil
+	}
+
+	if a.textbox.Value() != "COPY" {
+		return func() tea.Msg {
+			return a.newErrorMsg("confirmation text does not match")
+		}
+	}
+
+	return func() tea.Msg {
+		// 1. Download from source backend
+		handle, err := src.explorer.Download(item.Info.FullPath)
+		if err != nil {
+			return a.newErrorMsg("Copy failed: " + err.Error())
+		}
+
+		// We will collect ALL errors here
+		var errs []string
+
+		// 2. Upload to destination backend
+		dstPath := path.Join(dst.explorer.Cwd(), item.Info.Name)
+		if err := dst.explorer.UploadFrom(handle.Path(), dstPath); err != nil {
+			errs = append(errs, "Copy failed: "+err.Error())
+		}
+
+		// 3. Always close the handle, even if upload failed
+		if err := handle.Close(); err != nil {
+			errs = append(errs, "Cleanup failed: "+err.Error())
+		}
+
+		// 4. Refresh destination pane
+		dst.refresh()
+
+		// 5. If any errors occurred, show them
+		if len(errs) > 0 {
+			return a.newErrorMsg(strings.Join(errs, " | "))
+		}
+
+		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", item.Info.FullPath, dstPath))
+	}
+}
+
+func (a *App) applyMakeDir() tea.Cmd {
 	active := a.activePane()
 	newDirPath := path.Join(active.explorer.Cwd(), a.textbox.Value())
 
 	if err := active.explorer.Mkdir(newDirPath); err != nil {
-		return err
+		return func() tea.Msg {
+			return a.newErrorMsg("Mkdir failed: " + err.Error())
+		}
 	}
 
 	// Refresh both panes that show this directory
 	a.refreshPanesForPath(active.explorer.Cwd())
 
-	return nil
+	return func() tea.Msg {
+		return a.newStatusMsg(fmt.Sprintf("Created directory %q", newDirPath))
+	}
 }
 
-func (a *App) applyDelete() error {
+func (a *App) applyDelete() tea.Cmd {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
 	if !ok {
@@ -411,17 +460,23 @@ func (a *App) applyDelete() error {
 	}
 
 	if a.textbox.Value() != "DELETE" {
-		return errors.New("confirmation text does not match")
+		return func() tea.Msg {
+			return a.newErrorMsg("confirmation text does not match")
+		}
 	}
 
 	if err := pane.explorer.Delete(item.Info.FullPath); err != nil {
-		return err
+		return func() tea.Msg {
+			return a.newErrorMsg("Delete failed: " + err.Error())
+		}
 	}
 
 	// Refresh both panes that show this directory
 	a.refreshPanesForPath(pane.explorer.Cwd())
 
-	return nil
+	return func() tea.Msg {
+		return a.newStatusMsg(fmt.Sprintf("Deleted %q", item.Info.FullPath))
+	}
 }
 
 func (a *App) newErrorMsg(text string) tea.Msg {
@@ -437,6 +492,17 @@ func (a *App) runRename() (tea.Model, tea.Cmd) {
 	if item, ok := pane.SelectedItem(); ok {
 		a.inputMode = inputRename
 		a.textbox.SetValue(item.Info.Name)
+		a.textbox.Focus()
+	}
+
+	return a, nil
+}
+
+func (a *App) runCopy() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	if _, ok := pane.SelectedItem(); ok {
+		a.inputMode = inputConfirmCopy
+		a.textbox.SetValue("")
 		a.textbox.Focus()
 	}
 
@@ -541,59 +607,6 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 
 		return nil
 	})
-}
-
-func (a *App) runCopy() (tea.Model, tea.Cmd) {
-	src := a.activePane()
-
-	// pick destination pane
-	dst := &a.left
-	if src == &a.left {
-		dst = &a.right
-	}
-
-	if src.explorer.Cwd() == dst.explorer.Cwd() {
-		return a, func() tea.Msg {
-			return a.newErrorMsg("Source and destination are the same")
-		}
-	}
-
-	item, ok := src.SelectedItem()
-	if !ok || (item.Info.IsDir && item.Info.Name == "..") || item.Info.IsSymlinkToDir {
-		return a, nil
-	}
-
-	return a, func() tea.Msg {
-		// 1. Download from source backend
-		handle, err := src.explorer.Download(item.Info.FullPath)
-		if err != nil {
-			return a.newErrorMsg("Copy failed: " + err.Error())
-		}
-
-		// We will collect ALL errors here
-		var errs []string
-
-		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(), item.Info.Name)
-		if err := dst.explorer.UploadFrom(handle.Path(), dstPath); err != nil {
-			errs = append(errs, "Copy failed: "+err.Error())
-		}
-
-		// 3. Always close the handle, even if upload failed
-		if err := handle.Close(); err != nil {
-			errs = append(errs, "Cleanup failed: "+err.Error())
-		}
-
-		// 4. Refresh destination pane
-		dst.refresh()
-
-		// 5. If any errors occurred, show them
-		if len(errs) > 0 {
-			return a.newErrorMsg(strings.Join(errs, " | "))
-		}
-
-		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", item.Info.FullPath, dstPath))
-	}
 }
 
 func sameDir(a, b string) bool {
