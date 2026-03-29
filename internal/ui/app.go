@@ -94,6 +94,10 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			currentInput := a.inputMode
 			a.inputMode = inputNone
 
+			if a.textbox.Value() == "" {
+				return a, nil
+			}
+
 			switch currentInput {
 			case inputRename:
 				return a, a.applyRename()

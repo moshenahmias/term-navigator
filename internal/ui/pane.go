@@ -60,7 +60,7 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 
 	gap := strings.Repeat(" ", spaces)
 
-	dimDesc := style.Copy().Foreground(lipgloss.Color("8")).Render(desc)
+	dimDesc := style.Foreground(lipgloss.Color("8")).Render(desc)
 
 	line := title + gap + dimDesc
 
@@ -129,7 +129,15 @@ func (f *FileItem) Title() string {
 }
 
 func (f *FileItem) Description() string {
-	return fmt.Sprintf("%d bytes • %s", f.Info.Size, f.Info.Modified.Format("2006-01-02 15:04"))
+	// Directories: skip size if it's zero
+	if f.Info.IsDir && f.Info.Size == 0 {
+		return f.Info.Modified.Format("2006-01-02 15:04")
+	}
+
+	// Files or dirs with non-zero size
+	return fmt.Sprintf("%d bytes • %s",
+		f.Info.Size,
+		f.Info.Modified.Format("2006-01-02 15:04"))
 }
 
 func (f *FileItem) FilterValue() string { return f.Info.Name }
