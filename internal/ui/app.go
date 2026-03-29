@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path"
@@ -8,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moshenahmias/term-navigator/internal/explorer"
+	"github.com/moshenahmias/term-navigator/internal/file"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -60,23 +61,23 @@ var inputText = map[inputMode]inputSettings{
 var _ tea.Model = (*App)(nil)
 
 type App struct {
-	left      Pane
-	right     Pane
+	left      *Pane
+	right     *Pane
 	focus     int // 0 = left, 1 = right
 	textbox   textinput.Model
 	inputMode inputMode
-
-	msg statusMsg
+	msg       statusMsg
+	ctx       context.Context
 }
 
-func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) *App {
+func NewApp(ctx context.Context, leftExp, rightExp file.Explorer, width, height int) *App {
 	half := width / 2
 	ti := textinput.New()
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 
-	left := NewPane(leftExp, half, height)
-	right := NewPane(rightExp, half, height)
+	left := NewPane(ctx, leftExp, half, height)
+	right := NewPane(ctx, rightExp, half, height)
 
 	left.SetActive(true)
 
@@ -85,6 +86,7 @@ func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) *App {
 		right:   right,
 		focus:   0,
 		textbox: ti,
+		ctx:     ctx,
 	}
 }
 
@@ -167,25 +169,25 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 
 		case "enter":
-			pane := &a.left
+			pane := a.left
 			if a.focus == 1 {
-				pane = &a.right
+				pane = a.right
 			}
 
 			info, err := pane.Selected()
 			if err == nil && (info.IsDir || info.IsSymlinkToDir) {
-				pane.explorer.Chdir(info.FullPath)
+				pane.explorer.Chdir(a.ctx, info.FullPath)
 				pane.refresh()
 			}
 
 			return a, nil
 		case "backspace":
 			active := a.activePane() // left or right
-			cwd := active.explorer.Cwd()
+			cwd := active.explorer.Cwd(a.ctx)
 
 			parent := filepath.Dir(cwd)
 
-			if err := active.explorer.Chdir(parent); err == nil {
+			if err := active.explorer.Chdir(a.ctx, parent); err == nil {
 				active.refresh()
 			}
 		case "f1": // Help
@@ -315,9 +317,9 @@ func (a *App) View() tea.View {
 
 func (a *App) activePane() *Pane {
 	if a.focus == 0 {
-		return &a.left
+		return a.left
 	}
-	return &a.right
+	return a.right
 }
 
 func (a *App) commandBar() string {
@@ -416,7 +418,7 @@ func (a *App) applyRename() tea.Cmd {
 	newPath := path.Join(path.Dir(oldPath), newName)
 
 	// Perform backend rename
-	if err := pane.explorer.Rename(oldPath, newPath); err != nil {
+	if err := pane.explorer.Rename(a.ctx, oldPath, newPath); err != nil {
 		return func() tea.Msg {
 			return a.newErrorMsg("Rename failed: " + err.Error())
 		}
@@ -436,12 +438,12 @@ func (a *App) applyCopy() tea.Cmd {
 	src := a.activePane()
 
 	// pick destination pane
-	dst := &a.left
-	if src == &a.left {
-		dst = &a.right
+	dst := a.left
+	if src == a.left {
+		dst = a.right
 	}
 
-	if src.explorer.Cwd() == dst.explorer.Cwd() {
+	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
 		return func() tea.Msg {
 			return a.newErrorMsg("Source and destination are the same")
 		}
@@ -460,7 +462,7 @@ func (a *App) applyCopy() tea.Cmd {
 
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(item.Info.FullPath)
+		handle, err := src.explorer.Download(a.ctx, item.Info.FullPath)
 		if err != nil {
 			return a.newErrorMsg("Copy failed: " + err.Error())
 		}
@@ -469,8 +471,8 @@ func (a *App) applyCopy() tea.Cmd {
 		var errs []string
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(), item.Info.Name)
-		if err := dst.explorer.UploadFrom(handle.Path(), dstPath); err != nil {
+		dstPath := path.Join(dst.explorer.Cwd(a.ctx), item.Info.Name)
+		if err := dst.explorer.UploadFrom(a.ctx, handle.Path(), dstPath); err != nil {
 			errs = append(errs, "Copy failed: "+err.Error())
 		}
 
@@ -495,12 +497,12 @@ func (a *App) applyMove() tea.Cmd {
 	src := a.activePane()
 
 	// pick destination pane
-	dst := &a.left
-	if src == &a.left {
-		dst = &a.right
+	dst := a.left
+	if src == a.left {
+		dst = a.right
 	}
 
-	if src.explorer.Cwd() == dst.explorer.Cwd() {
+	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
 		return func() tea.Msg {
 			return a.newErrorMsg("Source and destination are the same")
 		}
@@ -519,7 +521,7 @@ func (a *App) applyMove() tea.Cmd {
 
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(item.Info.FullPath)
+		handle, err := src.explorer.Download(a.ctx, item.Info.FullPath)
 		if err != nil {
 			return a.newErrorMsg("Move failed: " + err.Error())
 		}
@@ -528,8 +530,8 @@ func (a *App) applyMove() tea.Cmd {
 		var errs []string
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(), item.Info.Name)
-		if err := dst.explorer.UploadFrom(handle.Path(), dstPath); err != nil {
+		dstPath := path.Join(dst.explorer.Cwd(a.ctx), item.Info.Name)
+		if err := dst.explorer.UploadFrom(a.ctx, handle.Path(), dstPath); err != nil {
 			errs = append(errs, "Move failed: "+err.Error())
 		}
 
@@ -540,14 +542,14 @@ func (a *App) applyMove() tea.Cmd {
 
 		// 4. Attempt to delete source (only if download/upload succeeded)
 		if len(errs) == 0 {
-			if err := src.explorer.Delete(item.Info.FullPath); err != nil {
+			if err := src.explorer.Delete(a.ctx, item.Info.FullPath); err != nil {
 				errs = append(errs, "Delete failed: "+err.Error())
 			}
 		}
 
 		// 5. Refresh both panes that show the source and destination directories
-		a.refreshPanesForPath(src.explorer.Cwd())
-		a.refreshPanesForPath(dst.explorer.Cwd())
+		a.refreshPanesForPath(src.explorer.Cwd(a.ctx))
+		a.refreshPanesForPath(dst.explorer.Cwd(a.ctx))
 
 		// 6. If any errors occurred, show them
 		if len(errs) > 0 {
@@ -560,9 +562,9 @@ func (a *App) applyMove() tea.Cmd {
 
 func (a *App) applyMakeDir() tea.Cmd {
 	active := a.activePane()
-	newDirPath := path.Join(active.explorer.Cwd(), a.textbox.Value())
+	newDirPath := path.Join(active.explorer.Cwd(a.ctx), a.textbox.Value())
 
-	if err := active.explorer.Mkdir(newDirPath); err != nil {
+	if err := active.explorer.Mkdir(a.ctx, newDirPath); err != nil {
 		return func() tea.Msg {
 			return a.newErrorMsg("Mkdir failed: " + err.Error())
 		}
@@ -570,7 +572,7 @@ func (a *App) applyMakeDir() tea.Cmd {
 
 	// Refresh both panes that show this directory
 	active.lastSelectedPath = newDirPath
-	a.refreshPanesForPath(active.explorer.Cwd())
+	a.refreshPanesForPath(active.explorer.Cwd(a.ctx))
 
 	return func() tea.Msg {
 		return a.newStatusMsg(fmt.Sprintf("Created directory %q", newDirPath))
@@ -594,14 +596,14 @@ func (a *App) applyDelete() tea.Cmd {
 		}
 	}
 
-	if err := pane.explorer.Delete(item.Info.FullPath); err != nil {
+	if err := pane.explorer.Delete(a.ctx, item.Info.FullPath); err != nil {
 		return func() tea.Msg {
 			return a.newErrorMsg("Delete failed: " + err.Error())
 		}
 	}
 
 	// Refresh both panes that show this directory
-	a.refreshPanesForPath(pane.explorer.Cwd())
+	a.refreshPanesForPath(pane.explorer.Cwd(a.ctx))
 
 	return func() tea.Msg {
 		return a.newStatusMsg(fmt.Sprintf("Deleted %q", item.Info.FullPath))
@@ -675,7 +677,7 @@ func (a *App) runView() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	handle, err := pane.explorer.Download(item.Info.FullPath)
+	handle, err := pane.explorer.Download(a.ctx, item.Info.FullPath)
 	if err != nil {
 		return a, func() tea.Msg {
 			return a.newErrorMsg("Download failed: " + err.Error())
@@ -713,7 +715,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	handle, err := pane.explorer.Download(item.Info.FullPath)
+	handle, err := pane.explorer.Download(a.ctx, item.Info.FullPath)
 	if err != nil {
 		return a, func() tea.Msg {
 			return a.newErrorMsg("Download failed: " + err.Error())
@@ -730,7 +732,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 			errs = append(errs, "Editor failed: "+procErr.Error())
 		} else {
 			// 2. Upload error (only if editor succeeded)
-			if err := pane.explorer.UploadFrom(handle.Path(), item.Info.FullPath); err != nil {
+			if err := pane.explorer.UploadFrom(a.ctx, handle.Path(), item.Info.FullPath); err != nil {
 				errs = append(errs, "Upload failed: "+err.Error())
 			}
 		}
@@ -748,7 +750,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 		pane.lastSelectedPath = item.Info.FullPath
 
 		// Refresh both panes that show this directory
-		a.refreshPanesForPath(pane.explorer.Cwd())
+		a.refreshPanesForPath(pane.explorer.Cwd(a.ctx))
 
 		return nil
 	})
@@ -773,10 +775,10 @@ func sameDir(a, b string) bool {
 func (a *App) refreshPanesForPath(path string) {
 	clean := filepath.Clean(path)
 
-	if sameDir(a.left.explorer.Cwd(), clean) {
+	if sameDir(a.left.explorer.Cwd(a.ctx), clean) {
 		a.left.refresh()
 	}
-	if sameDir(a.right.explorer.Cwd(), clean) {
+	if sameDir(a.right.explorer.Cwd(a.ctx), clean) {
 		a.right.refresh()
 	}
 }

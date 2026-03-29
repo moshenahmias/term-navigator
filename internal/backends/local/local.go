@@ -1,42 +1,43 @@
 package local
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/moshenahmias/term-navigator/internal/explorer"
+	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
-type localTempFileHandle struct {
+type tempFile struct {
 	path string
 }
 
-var _ explorer.TempFileHandle = localTempFileHandle{}
+var _ file.Temp = tempFile{}
 
-func (h localTempFileHandle) Path() string { return h.path }
-func (h localTempFileHandle) Close() error { return nil } // no-op
+func (h tempFile) Path() string { return h.path }
+func (h tempFile) Close() error { return nil } // no-op
 
-type Explorer struct {
+type explorer struct {
 	cwd string
 }
 
-var _ explorer.FileExplorer = (*Explorer)(nil)
+var _ file.Explorer = (*explorer)(nil)
 
-func NewExplorer(startPath string) *Explorer {
+func NewExplorer(startPath string) file.Explorer {
 	abs, err := filepath.Abs(startPath)
 	if err != nil {
 		abs = startPath
 	}
-	return &Explorer{cwd: abs}
+	return &explorer{cwd: abs}
 }
 
-func (l *Explorer) Cwd() string {
+func (l *explorer) Cwd(context.Context) string {
 	return l.cwd
 }
 
-func (l *Explorer) Chdir(path string) error {
+func (l *explorer) Chdir(_ context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {
 		abs = filepath.Join(l.cwd, path)
@@ -54,13 +55,13 @@ func (l *Explorer) Chdir(path string) error {
 	return nil
 }
 
-func (l *Explorer) List() ([]explorer.FileInfo, error) {
+func (l *explorer) List(context.Context) ([]file.Info, error) {
 	entries, err := os.ReadDir(l.cwd)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]explorer.FileInfo, 0, len(entries))
+	out := make([]file.Info, 0, len(entries))
 	for _, e := range entries {
 		full := filepath.Join(l.cwd, e.Name())
 
@@ -82,7 +83,7 @@ func (l *Explorer) List() ([]explorer.FileInfo, error) {
 			}
 		}
 
-		out = append(out, explorer.FileInfo{
+		out = append(out, file.Info{
 			Name:           e.Name(),
 			FullPath:       full,
 			IsDir:          isDir,
@@ -97,7 +98,7 @@ func (l *Explorer) List() ([]explorer.FileInfo, error) {
 	return out, nil
 }
 
-func (l *Explorer) Stat(path string) (explorer.FileInfo, error) {
+func (l *explorer) Stat(_ context.Context, path string) (file.Info, error) {
 	abs := path
 	if !filepath.IsAbs(path) {
 		abs = filepath.Join(l.cwd, path)
@@ -105,7 +106,7 @@ func (l *Explorer) Stat(path string) (explorer.FileInfo, error) {
 
 	fi, err := os.Stat(abs)
 	if err != nil {
-		return explorer.FileInfo{}, err
+		return file.Info{}, err
 	}
 
 	isSymlink := fi.Mode()&os.ModeSymlink != 0
@@ -117,7 +118,7 @@ func (l *Explorer) Stat(path string) (explorer.FileInfo, error) {
 		}
 	}
 
-	return explorer.FileInfo{
+	return file.Info{
 		Name:           filepath.Base(abs),
 		FullPath:       abs,
 		IsDir:          fi.IsDir(),
@@ -129,12 +130,12 @@ func (l *Explorer) Stat(path string) (explorer.FileInfo, error) {
 	}, nil
 }
 
-func (l *Explorer) Exists(path string) bool {
-	_, err := l.Stat(path)
+func (l *explorer) Exists(ctx context.Context, path string) bool {
+	_, err := l.Stat(ctx, path)
 	return err == nil
 }
 
-func (l *Explorer) Read(path string) (io.ReadCloser, error) {
+func (l *explorer) Read(_ context.Context, path string) (io.ReadCloser, error) {
 	abs := path
 	if !filepath.IsAbs(path) {
 		abs = filepath.Join(l.cwd, path)
@@ -142,7 +143,7 @@ func (l *Explorer) Read(path string) (io.ReadCloser, error) {
 	return os.Open(abs)
 }
 
-func (l *Explorer) Write(path string, r io.Reader) error {
+func (l *explorer) Write(_ context.Context, path string, r io.Reader) error {
 	abs := path
 	if !filepath.IsAbs(path) {
 		abs = filepath.Join(l.cwd, path)
@@ -163,7 +164,7 @@ func (l *Explorer) Write(path string, r io.Reader) error {
 	return err
 }
 
-func (l *Explorer) Delete(path string) error {
+func (l *explorer) Delete(_ context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {
 		abs = filepath.Join(l.cwd, path)
@@ -171,7 +172,7 @@ func (l *Explorer) Delete(path string) error {
 	return os.RemoveAll(abs)
 }
 
-func (l *Explorer) Mkdir(path string) error {
+func (l *explorer) Mkdir(_ context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {
 		abs = filepath.Join(l.cwd, path)
@@ -179,7 +180,7 @@ func (l *Explorer) Mkdir(path string) error {
 	return os.MkdirAll(abs, 0755)
 }
 
-func (l *Explorer) Rename(oldPath, newPath string) error {
+func (l *explorer) Rename(_ context.Context, oldPath, newPath string) error {
 	absOld := oldPath
 	if !filepath.IsAbs(oldPath) {
 		absOld = filepath.Join(l.cwd, oldPath)
@@ -193,15 +194,15 @@ func (l *Explorer) Rename(oldPath, newPath string) error {
 	return os.Rename(absOld, absNew)
 }
 
-func (l *Explorer) Download(path string) (explorer.TempFileHandle, error) {
+func (l *explorer) Download(ctx context.Context, path string) (file.Temp, error) {
 	if path == "" {
 		return nil, errors.New("invalid path")
 	}
 
-	return localTempFileHandle{path: path}, nil
+	return tempFile{path: path}, nil
 }
 
-func (l *Explorer) UploadFrom(localPath, destPath string) error {
+func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) error {
 	if localPath == "" || destPath == "" {
 		return errors.New("invalid path")
 	}
@@ -250,7 +251,7 @@ func (l *Explorer) UploadFrom(localPath, destPath string) error {
 				return err
 			}
 
-			return l.Write(target, src)
+			return l.Write(ctx, target, src)
 		})
 	}
 
@@ -268,5 +269,5 @@ func (l *Explorer) UploadFrom(localPath, destPath string) error {
 	}
 	defer src.Close()
 
-	return l.Write(destPath, src)
+	return l.Write(ctx, destPath, src)
 }

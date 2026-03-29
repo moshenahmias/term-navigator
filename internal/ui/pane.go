@@ -1,12 +1,13 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
 
-	"github.com/moshenahmias/term-navigator/internal/explorer"
+	"github.com/moshenahmias/term-navigator/internal/file"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -68,7 +69,7 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 }
 
 type FileItem struct {
-	Info explorer.FileInfo
+	Info file.Info
 }
 
 func (f *FileItem) isDeleteable() bool {
@@ -147,15 +148,16 @@ func (f *FileItem) Description() string {
 func (f *FileItem) FilterValue() string { return f.Info.Name }
 
 type Pane struct {
-	explorer         explorer.FileExplorer
+	explorer         file.Explorer
 	list             list.Model
 	width            int
 	height           int
 	lastSelectedPath string
 	delegate         *ncDelegate
+	ctx              context.Context
 }
 
-func NewPane(exp explorer.FileExplorer, width, height int) Pane {
+func NewPane(ctx context.Context, exp file.Explorer, width, height int) *Pane {
 	// Create delegate with NC styles
 	d := ncDelegate{
 		normalStyle: lipgloss.NewStyle().
@@ -171,22 +173,20 @@ func NewPane(exp explorer.FileExplorer, width, height int) Pane {
 	l := list.New([]list.Item{}, d, width, height)
 
 	l.SetShowTitle(false)
-	//l.SetShowStatusBar(false)
-	//l.SetFilteringEnabled(false)
-	//l.SetShowHelp(false)
 
 	styles := list.DefaultStyles(true)
 
 	l.Styles = styles
-	l.Title = exp.Cwd()
+	l.Title = exp.Cwd(ctx)
 
 	// Build pane
-	p := Pane{
+	p := &Pane{
 		explorer: exp,
 		list:     l,
 		width:    width,
 		height:   height,
 		delegate: &d,
+		ctx:      ctx,
 	}
 
 	p.refresh()
@@ -194,7 +194,7 @@ func NewPane(exp explorer.FileExplorer, width, height int) Pane {
 }
 
 func (p *Pane) refresh() {
-	items, err := p.explorer.List()
+	items, err := p.explorer.List(p.ctx)
 	if err != nil {
 		p.list.SetItems([]list.Item{})
 		return
@@ -218,9 +218,9 @@ func (p *Pane) refresh() {
 	selectedIndex := 0 // default to first item
 
 	// Add ".." only if not at filesystem root
-	if p.explorer.Cwd() != "/" {
+	if p.explorer.Cwd(p.ctx) != "/" {
 		upItem := &FileItem{
-			Info: explorer.FileInfo{
+			Info: file.Info{
 				Name:     "..",
 				FullPath: "..",
 				IsDir:    true,
@@ -254,20 +254,18 @@ func (p *Pane) refresh() {
 	p.lastSelectedPath = ""
 }
 
-func (p Pane) Init() tea.Cmd { return nil }
+func (p *Pane) Init() tea.Cmd { return nil }
 
-func (p Pane) Update(msg tea.Msg) (Pane, tea.Cmd) {
+func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
 	var cmd tea.Cmd
 	p.list, cmd = p.list.Update(msg)
 	return p, cmd
 }
 
-func (p Pane) View() string {
-	//header := padToWidth(p.explorer.Cwd(), p.width)
-
+func (p *Pane) View() string {
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Render(p.explorer.Cwd())
+		Render(p.explorer.Cwd(p.ctx))
 
 	body := p.list.View()
 
@@ -275,10 +273,10 @@ func (p Pane) View() string {
 }
 
 // Selected returns the FileInfo of the currently selected item.
-func (p Pane) Selected() (explorer.FileInfo, error) {
+func (p *Pane) Selected() (file.Info, error) {
 	item, ok := p.list.SelectedItem().(*FileItem)
 	if !ok {
-		return explorer.FileInfo{}, fmt.Errorf("no selection")
+		return file.Info{}, fmt.Errorf("no selection")
 	}
 	return item.Info, nil
 }
