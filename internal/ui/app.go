@@ -450,8 +450,14 @@ func (a *App) runCopy() (tea.Model, tea.Cmd) {
 		dst = &a.right
 	}
 
+	if src.explorer.Cwd() == dst.explorer.Cwd() {
+		return a, func() tea.Msg {
+			return a.newErrorMsg("Source and destination are the same")
+		}
+	}
+
 	item, ok := src.SelectedItem()
-	if !ok || item.Info.IsDir {
+	if !ok || (item.Info.IsDir && item.Info.Name == "..") || item.Info.IsSymlinkToDir {
 		return a, nil
 	}
 

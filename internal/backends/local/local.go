@@ -211,19 +211,62 @@ func (l *LocalExplorer) UploadFrom(localPath, destPath string) error {
 		return nil
 	}
 
-	// Ensure destination directory exists
-	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	info, err := os.Stat(localPath)
+	if err != nil {
 		return err
 	}
 
-	// Open source file
+	// -----------------------------
+	// CASE 1: Uploading a directory
+	// -----------------------------
+	if info.IsDir() {
+		return filepath.Walk(localPath, func(p string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// Compute relative path inside the directory
+			rel, err := filepath.Rel(localPath, p)
+			if err != nil {
+				return err
+			}
+
+			target := filepath.Join(destPath, rel)
+
+			if fi.IsDir() {
+				// Create directory in destination
+				return os.MkdirAll(target, 0755)
+			}
+
+			// Upload file
+			src, err := os.Open(p)
+			if err != nil {
+				return err
+			}
+			defer src.Close()
+
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return err
+			}
+
+			return l.Write(target, src)
+		})
+	}
+
+	// -----------------------------
+	// CASE 2: Uploading a single file
+	// -----------------------------
+	// Ensure destination directory exists
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return err
+	}
+
 	src, err := os.Open(localPath)
 	if err != nil {
 		return err
 	}
 	defer src.Close()
 
-	// Delegate actual writing to backend's Write()
 	return l.Write(destPath, src)
 }
