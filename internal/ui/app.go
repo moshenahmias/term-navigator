@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os/exec"
 	"path"
 	"path/filepath"
 
@@ -137,6 +138,26 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.renameInput.Focus()
 
 			return a, nil
+		case "f3": // View
+			pane := a.activePane()
+			item, ok := pane.SelectedItem()
+			if !ok || item.Info.IsDir {
+				return a, nil
+			}
+
+			cmd := exec.Command("less", item.Info.FullPath)
+			return a, tea.ExecProcess(cmd, nil)
+
+		case "f4": // Edit
+			pane := a.activePane()
+			item, ok := pane.SelectedItem()
+			if !ok || item.Info.IsDir {
+				return a, nil
+			}
+
+			cmd := exec.Command("vim", item.Info.FullPath)
+			return a, tea.ExecProcess(cmd, nil)
+
 		}
 	}
 
