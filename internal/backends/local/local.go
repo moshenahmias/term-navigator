@@ -13,12 +13,16 @@ type localTempFileHandle struct {
 	path string
 }
 
+var _ explorer.TempFileHandle = localTempFileHandle{}
+
 func (h localTempFileHandle) Path() string { return h.path }
 func (h localTempFileHandle) Close() error { return nil } // no-op
 
 type LocalExplorer struct {
 	cwd string
 }
+
+var _ explorer.FileExplorer = (*LocalExplorer)(nil)
 
 func NewLocalExplorer(startPath string) *LocalExplorer {
 	abs, err := filepath.Abs(startPath)

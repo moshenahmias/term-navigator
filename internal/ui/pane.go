@@ -25,16 +25,16 @@ func (d ncDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	return nil
 }
 
-func padToWidth(s string, width int) string {
-	w := lipgloss.Width(s)
-	if w >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-w)
-}
+// func padToWidth(s string, width int) string {
+// 	w := lipgloss.Width(s)
+// 	if w >= width {
+// 		return s
+// 	}
+// 	return s + strings.Repeat(" ", width-w)
+// }
 
 func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	fi, ok := item.(FileItem)
+	fi, ok := item.(*FileItem)
 	if !ok {
 		return
 	}
@@ -60,7 +60,7 @@ type FileItem struct {
 	Info explorer.FileInfo
 }
 
-func (f FileItem) Title() string {
+func (f *FileItem) Title() string {
 	name := f.Info.Name
 
 	if f.Info.IsDir && name != ".." {
@@ -70,8 +70,8 @@ func (f FileItem) Title() string {
 	return name
 }
 
-func (f FileItem) Description() string { return "" }
-func (f FileItem) FilterValue() string { return f.Info.Name }
+func (f *FileItem) Description() string { return "" }
+func (f *FileItem) FilterValue() string { return f.Info.Name }
 
 type Pane struct {
 	explorer         explorer.FileExplorer
@@ -146,7 +146,7 @@ func (p *Pane) refresh() {
 
 	// Add ".." only if not at filesystem root
 	if p.explorer.Cwd() != "/" {
-		upItem := FileItem{
+		upItem := &FileItem{
 			Info: explorer.FileInfo{
 				Name:     "..",
 				FullPath: "..",
@@ -164,7 +164,7 @@ func (p *Pane) refresh() {
 
 	// Add real items
 	for i, fi := range items {
-		item := FileItem{Info: fi}
+		item := &FileItem{Info: fi}
 		li = append(li, item)
 
 		// 🔥 If this item matches the renamed path, remember its index
@@ -203,7 +203,7 @@ func (p Pane) View() string {
 
 // Selected returns the FileInfo of the currently selected item.
 func (p Pane) Selected() (explorer.FileInfo, error) {
-	item, ok := p.list.SelectedItem().(FileItem)
+	item, ok := p.list.SelectedItem().(*FileItem)
 	if !ok {
 		return explorer.FileInfo{}, fmt.Errorf("no selection")
 	}
@@ -218,13 +218,13 @@ func (p *Pane) Resize(width, height int) {
 	p.list.SetSize(width, height-3)
 }
 
-func (p *Pane) SelectedItem() (FileItem, bool) {
+func (p *Pane) SelectedItem() (*FileItem, bool) {
 	item := p.list.SelectedItem()
 	if item == nil {
-		return FileItem{}, false
+		return nil, false
 	}
 
-	fi, ok := item.(FileItem)
+	fi, ok := item.(*FileItem)
 	return fi, ok
 }
 

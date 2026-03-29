@@ -145,6 +145,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "f4": // Edit
 			return a.runEdit()
+		case "f10":
+			return a, tea.Quit
 
 		}
 	}
