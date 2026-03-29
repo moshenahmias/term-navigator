@@ -48,10 +48,29 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 		style = d.normalStyle
 	}
 
-	line := fi.Title()
+	title := fi.Title()
+	desc := fi.Description()
+
 	if fi.Info.IsSymlink {
-		line += " ↪"
+		title += " ↪"
 	}
+
+	// FIX: subtract borders/padding
+	innerWidth := m.Width() - 2 // adjust if you have padding
+
+	titleWidth := lipgloss.Width(title)
+	descWidth := lipgloss.Width(desc)
+
+	spaces := innerWidth - titleWidth - descWidth
+	if spaces < 1 {
+		spaces = 1
+	}
+
+	gap := strings.Repeat(" ", spaces)
+
+	dimDesc := style.Copy().Foreground(lipgloss.Color("8")).Render(desc)
+
+	line := title + gap + dimDesc
 
 	fmt.Fprint(w, style.Render(line))
 }
@@ -70,7 +89,10 @@ func (f *FileItem) Title() string {
 	return name
 }
 
-func (f *FileItem) Description() string { return "" }
+func (f *FileItem) Description() string {
+	return fmt.Sprintf("%d bytes • %s", f.Info.Size, f.Info.Modified.Format("2006-01-02 15:04"))
+}
+
 func (f *FileItem) FilterValue() string { return f.Info.Name }
 
 type Pane struct {
