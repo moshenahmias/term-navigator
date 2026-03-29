@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/moshenahmias/term-navigator/internal/explorer"
 
@@ -31,6 +32,7 @@ type App struct {
 	focus       int // 0 = left, 1 = right
 	renaming    bool
 	renameInput textinput.Model
+	lastError   string
 }
 
 func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) App {
@@ -79,6 +81,10 @@ func (a App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	case ErrorMsg:
+		a.lastError = msg.Text
+		return a, nil
 
 	case tea.WindowSizeMsg:
 		totalWidth := msg.Width
@@ -145,8 +151,35 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, nil
 			}
 
-			cmd := exec.Command("less", item.Info.FullPath)
-			return a, tea.ExecProcess(cmd, nil)
+			handle, err := pane.explorer.Download(item.Info.FullPath)
+			if err != nil {
+				return a, func() tea.Msg {
+					return a.newErrorMsg("Download failed: " + err.Error())
+				}
+			}
+
+			cmd := exec.Command("less", handle.Path())
+
+			return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
+				var errs []string
+
+				// 1. less error
+				if procErr != nil {
+					errs = append(errs, "Viewer failed: "+procErr.Error())
+				}
+
+				// 2. cleanup error
+				if err := handle.Close(); err != nil {
+					errs = append(errs, "Cleanup failed: "+err.Error())
+				}
+
+				// 3. return combined error or nil
+				if len(errs) > 0 {
+					return a.newErrorMsg(strings.Join(errs, " | "))
+				}
+
+				return nil
+			})
 
 		case "f4": // Edit
 			pane := a.activePane()
@@ -155,8 +188,40 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, nil
 			}
 
-			cmd := exec.Command("vim", item.Info.FullPath)
-			return a, tea.ExecProcess(cmd, nil)
+			handle, err := pane.explorer.Download(item.Info.FullPath)
+			if err != nil {
+				return a, func() tea.Msg {
+					return a.newErrorMsg("Download failed: " + err.Error())
+				}
+			}
+
+			cmd := exec.Command("vim", handle.Path())
+
+			return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
+				var errs []string
+
+				// 1. Editor error
+				if procErr != nil {
+					errs = append(errs, "Editor failed: "+procErr.Error())
+				} else {
+					// 2. Upload error (only if editor succeeded)
+					if err := pane.explorer.UploadFrom(handle.Path(), item.Info.FullPath); err != nil {
+						errs = append(errs, "Upload failed: "+err.Error())
+					}
+				}
+
+				// 3. Cleanup error (always attempt)
+				if err := handle.Close(); err != nil {
+					errs = append(errs, "Cleanup failed: "+err.Error())
+				}
+
+				// 4. Return combined error or nil
+				if len(errs) > 0 {
+					return a.newErrorMsg(strings.Join(errs, " | "))
+				}
+
+				return nil
+			})
 
 		}
 	}
@@ -218,21 +283,33 @@ func (a App) View() tea.View {
 			a.renameInput.View(),
 		)
 		v := tea.NewView(renameBox)
-		v.AltScreen = true // 🔥 use alternate screen
+		v.AltScreen = true
 		return v
 	}
 
 	// 5. Footer
 	footer := a.commandBar()
 
+	// 🔥 6. Optional error bar
+	var errorBar string
+	if a.lastError != "" {
+		errorBar = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("1")). // red
+			Padding(0, 1).
+			Render("Error: " + a.lastError)
+	}
+
+	// 7. Compose final layout
 	out := lipgloss.JoinVertical(
 		lipgloss.Left,
 		panes,
+		errorBar, // 🔥 inserted here
 		footer,
 	)
 
 	v := tea.NewView(out)
-	v.AltScreen = true // 🔥 use alternate screen
+	v.AltScreen = true
+
 	return v
 }
 
@@ -302,4 +379,12 @@ func (a *App) applyRename() {
 
 	// Refresh pane contents
 	pane.refresh()
+}
+
+type ErrorMsg struct {
+	Text string
+}
+
+func (a App) newErrorMsg(text string) ErrorMsg {
+	return ErrorMsg{Text: text}
 }

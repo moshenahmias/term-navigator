@@ -1,12 +1,20 @@
 package local
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/moshenahmias/term-navigator/internal/explorer"
 )
+
+type localTempFileHandle struct {
+	path string
+}
+
+func (h localTempFileHandle) Path() string { return h.path }
+func (h localTempFileHandle) Close() error { return nil } // no-op
 
 type LocalExplorer struct {
 	cwd string
@@ -179,4 +187,39 @@ func (l *LocalExplorer) Rename(oldPath, newPath string) error {
 	}
 
 	return os.Rename(absOld, absNew)
+}
+
+func (l *LocalExplorer) Download(path string) (explorer.TempFileHandle, error) {
+	if path == "" {
+		return nil, errors.New("invalid path")
+	}
+
+	return localTempFileHandle{path: path}, nil
+}
+
+func (l *LocalExplorer) UploadFrom(localPath, destPath string) error {
+	if localPath == "" || destPath == "" {
+		return errors.New("invalid path")
+	}
+
+	// No-op if source and destination are identical
+	if localPath == destPath {
+		return nil
+	}
+
+	// Ensure destination directory exists
+	destDir := filepath.Dir(destPath)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return err
+	}
+
+	// Open source file
+	src, err := os.Open(localPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	// Delegate actual writing to backend's Write()
+	return l.Write(destPath, src)
 }

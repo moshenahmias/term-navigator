@@ -16,6 +16,11 @@ type FileInfo struct {
 	IsSymlinkToDir bool
 }
 
+type TempFileHandle interface {
+	Path() string
+	Close() error
+}
+
 type FileExplorer interface {
 	Cwd() string
 	Chdir(path string) error
@@ -30,4 +35,7 @@ type FileExplorer interface {
 	Delete(path string) error
 	Mkdir(path string) error
 	Rename(oldPath, newPath string) error
+
+	Download(path string) (TempFileHandle, error)
+	UploadFrom(localPath, destPath string) error
 }
