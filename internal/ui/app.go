@@ -13,8 +13,13 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	_ "embed"
+
 	"charm.land/lipgloss/v2"
 )
+
+//go:embed help.txt
+var helpText string
 
 var (
 	ncBorder = lipgloss.NewStyle().
@@ -183,6 +188,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := active.explorer.Chdir(parent); err == nil {
 				active.refresh()
 			}
+		case "f1": // Help
+			return a.runHelp()
 		case "f2": // rename
 			return a.runRename()
 
@@ -675,7 +682,7 @@ func (a *App) runView() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	cmd := exec.Command("less", handle.Path())
+	cmd := exec.Command("less", "+1", handle.Path())
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
 		var errs []string
@@ -743,6 +750,18 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 		// Refresh both panes that show this directory
 		a.refreshPanesForPath(pane.explorer.Cwd())
 
+		return nil
+	})
+}
+
+func (a *App) runHelp() (tea.Model, tea.Cmd) {
+	cmd := exec.Command("less", "+1")
+	cmd.Stdin = strings.NewReader(helpText)
+
+	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return a.newErrorMsg("Help failed: " + err.Error())
+		}
 		return nil
 	})
 }
