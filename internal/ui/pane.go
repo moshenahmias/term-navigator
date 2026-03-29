@@ -25,14 +25,6 @@ func (d ncDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	return nil
 }
 
-// func padToWidth(s string, width int) string {
-// 	w := lipgloss.Width(s)
-// 	if w >= width {
-// 		return s
-// 	}
-// 	return s + strings.Repeat(" ", width-w)
-// }
-
 func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	fi, ok := item.(*FileItem)
 	if !ok {
@@ -79,7 +71,27 @@ type FileItem struct {
 	Info explorer.FileInfo
 }
 
-func (f *FileItem) Title2() string {
+func (f *FileItem) isDeleteable() bool {
+	return !f.Info.IsDir || f.Info.Name != ".."
+}
+
+func (f *FileItem) isRenamable() bool {
+	return !f.Info.IsDir || f.Info.Name != ".."
+}
+
+func (f *FileItem) isCopyable() bool {
+	return !f.Info.IsDir || f.Info.Name != ".."
+}
+
+func (f *FileItem) isViewable() bool {
+	return !f.Info.IsDir
+}
+
+func (f *FileItem) isEditable() bool {
+	return !f.Info.IsDir
+}
+
+func (f *FileItem) TitleNoIcons() string {
 	name := f.Info.Name
 
 	if f.Info.IsDir && name != ".." {

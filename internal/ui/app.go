@@ -17,14 +17,8 @@ import (
 )
 
 var (
-	paneStyle      = lipgloss.NewStyle() // no background, no foreground
-	separatorStyle = lipgloss.NewStyle().Render("│")
-
-	ncPaneStyle = lipgloss.NewStyle() // no forced colors
-
 	ncBorder = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()) // simple border
-
+		Border(lipgloss.NormalBorder()) // simple border
 )
 
 type statusMsg struct {
@@ -349,6 +343,10 @@ func (a *App) applyRename() tea.Cmd {
 		return nil
 	}
 
+	if !fi.isRenamable() {
+		return nil
+	}
+
 	newName := a.textbox.Value()
 	if newName == "" || newName == fi.Info.Name {
 		return nil
@@ -392,6 +390,10 @@ func (a *App) applyCopy() tea.Cmd {
 
 	item, ok := src.SelectedItem()
 	if !ok || (item.Info.IsDir && item.Info.Name == "..") || item.Info.IsSymlinkToDir {
+		return nil
+	}
+
+	if !item.isCopyable() {
 		return nil
 	}
 
@@ -459,6 +461,10 @@ func (a *App) applyDelete() tea.Cmd {
 		return nil
 	}
 
+	if !item.isDeleteable() {
+		return nil
+	}
+
 	if a.textbox.Value() != "DELETE" {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
@@ -489,7 +495,7 @@ func (a *App) newStatusMsg(text string) tea.Msg {
 
 func (a *App) runRename() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
-	if item, ok := pane.SelectedItem(); ok {
+	if item, ok := pane.SelectedItem(); ok && item.isRenamable() {
 		a.inputMode = inputRename
 		a.textbox.SetValue(item.Info.Name)
 		a.textbox.Focus()
@@ -500,7 +506,7 @@ func (a *App) runRename() (tea.Model, tea.Cmd) {
 
 func (a *App) runCopy() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
-	if _, ok := pane.SelectedItem(); ok {
+	if item, ok := pane.SelectedItem(); ok && item.isCopyable() {
 		a.inputMode = inputConfirmCopy
 		a.textbox.SetValue("")
 		a.textbox.Focus()
@@ -519,7 +525,7 @@ func (a *App) runMakeDir() (tea.Model, tea.Cmd) {
 
 func (a *App) runDelete() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
-	if _, ok := pane.SelectedItem(); ok {
+	if item, ok := pane.SelectedItem(); ok && item.isDeleteable() {
 		a.inputMode = inputConfirmDelete
 		a.textbox.SetValue("")
 		a.textbox.Focus()
@@ -531,7 +537,7 @@ func (a *App) runDelete() (tea.Model, tea.Cmd) {
 func (a *App) runView() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
-	if !ok || item.Info.IsDir {
+	if !ok || !item.isViewable() {
 		return a, nil
 	}
 
@@ -569,7 +575,7 @@ func (a *App) runView() (tea.Model, tea.Cmd) {
 func (a *App) runEdit() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
-	if !ok || item.Info.IsDir {
+	if !ok || !item.isEditable() {
 		return a, nil
 	}
 
