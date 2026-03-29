@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	left := local.NewLocalExplorer(".")
-	right := local.NewLocalExplorer(".")
+	left := local.NewExplorer(".")
+	right := local.NewExplorer(".")
 
 	p := tea.NewProgram(ui.NewApp(left, right, 120, 30))
 

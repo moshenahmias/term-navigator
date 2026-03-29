@@ -72,15 +72,15 @@ type FileItem struct {
 }
 
 func (f *FileItem) isDeleteable() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return (!f.Info.IsDir || f.Info.Name != "..") && !f.Info.IsSymlinkToDir
 }
 
 func (f *FileItem) isRenamable() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return (!f.Info.IsDir || f.Info.Name != "..") && !f.Info.IsSymlinkToDir
 }
 
 func (f *FileItem) isCopyable() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return (!f.Info.IsDir || f.Info.Name != "..") && !f.Info.IsSymlinkToDir
 }
 
 func (f *FileItem) isMoveable() bool {
@@ -88,11 +88,11 @@ func (f *FileItem) isMoveable() bool {
 }
 
 func (f *FileItem) isViewable() bool {
-	return !f.Info.IsDir
+	return !f.Info.IsDir && !f.Info.IsSymlink
 }
 
 func (f *FileItem) isEditable() bool {
-	return !f.Info.IsDir
+	return !f.Info.IsDir && !f.Info.IsSymlink
 }
 
 func (f *FileItem) TitleNoIcons() string {
