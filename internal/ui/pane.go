@@ -79,7 +79,7 @@ type FileItem struct {
 	Info explorer.FileInfo
 }
 
-func (f *FileItem) Title() string {
+func (f *FileItem) Title2() string {
 	name := f.Info.Name
 
 	if f.Info.IsDir && name != ".." {
@@ -87,6 +87,33 @@ func (f *FileItem) Title() string {
 	}
 
 	return name
+}
+
+func (f *FileItem) Title() string {
+	name := f.Info.Name
+
+	var icon string
+	switch {
+	case f.Info.IsSymlink:
+		icon = "🔗"
+	case f.Info.IsDir:
+		icon = "📁"
+	default:
+		icon = "📄"
+	}
+
+	// Force icon to stable width
+	icon = lipgloss.NewStyle().
+		Width(2).     // always 2 columns
+		Inline(true). // prevent reflow
+		Render(icon)
+
+	// Add slash for directories
+	if f.Info.IsDir && name != ".." {
+		name += "/"
+	}
+
+	return icon + " " + name
 }
 
 func (f *FileItem) Description() string {
