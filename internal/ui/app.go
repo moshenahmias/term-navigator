@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/moshenahmias/term-navigator/internal/explorer"
 
@@ -26,13 +27,20 @@ var (
 
 )
 
+type statusMsg struct {
+	text  string
+	isErr bool
+}
+
+type clearStatusMsg struct{}
+
 type App struct {
 	left        Pane
 	right       Pane
 	focus       int // 0 = left, 1 = right
 	renaming    bool
 	renameInput textinput.Model
-	lastError   string
+	msg         statusMsg
 }
 
 func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) *App {
@@ -87,8 +95,13 @@ func (a *App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
-	case ErrorMsg:
-		a.lastError = msg.Text
+	case statusMsg:
+		a.msg = msg
+		return a, tea.Tick(time.Second*2, func(time.Time) tea.Msg {
+			return clearStatusMsg{}
+		})
+	case clearStatusMsg:
+		a.msg = statusMsg{} // reset to empty
 		return a, nil
 
 	case tea.WindowSizeMsg:
@@ -145,6 +158,9 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "f4": // Edit
 			return a.runEdit()
+		case "f5":
+			return a.runCopy()
+
 		case "f10":
 			return a, tea.Quit
 
@@ -169,6 +185,25 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return a.updateMain(msg)
+}
+
+var errorStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("#FF0000")).
+	Foreground(lipgloss.Color("#FFFFFF"))
+
+var successStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("#00AA00")).
+	Foreground(lipgloss.Color("#FFFFFF"))
+
+func (a *App) renderStatus() string {
+	if a.msg.text == "" {
+		return ""
+	}
+
+	if a.msg.isErr {
+		return errorStyle.Render(a.msg.text)
+	}
+	return successStyle.Render(a.msg.text)
 }
 
 func (a *App) View() tea.View {
@@ -215,20 +250,14 @@ func (a *App) View() tea.View {
 	// 5. Footer
 	footer := a.commandBar()
 
-	// 🔥 6. Optional error bar
-	var errorBar string
-	if a.lastError != "" {
-		errorBar = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("1")). // red
-			Padding(0, 1).
-			Render("Error: " + a.lastError)
-	}
+	// 🔥 6. Status bar
+	statusBar := a.renderStatus()
 
 	// 7. Compose final layout
 	out := lipgloss.JoinVertical(
 		lipgloss.Left,
 		panes,
-		errorBar, // 🔥 inserted here
+		statusBar, // 🔥 inserted here
 		footer,
 	)
 
@@ -307,12 +336,16 @@ func (a *App) applyRename() error {
 	return nil
 }
 
-type ErrorMsg struct {
-	Text string
+func (a *App) newErrorMsg(text string) tea.Msg {
+	return statusMsg{text: text, isErr: true}
 }
 
-func (a *App) newErrorMsg(text string) ErrorMsg {
-	return ErrorMsg{Text: text}
+func (a *App) newStatusMsg(text string) tea.Msg {
+	return statusMsg{text: text, isErr: false}
+}
+
+func (a *App) clearStatus() tea.Msg {
+	return statusMsg{}
 }
 
 func (a *App) runRename() (tea.Model, tea.Cmd) {
@@ -406,6 +439,53 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 
 		return nil
 	})
+}
+
+func (a *App) runCopy() (tea.Model, tea.Cmd) {
+	src := a.activePane()
+
+	// pick destination pane
+	dst := &a.left
+	if src == &a.left {
+		dst = &a.right
+	}
+
+	item, ok := src.SelectedItem()
+	if !ok || item.Info.IsDir {
+		return a, nil
+	}
+
+	return a, func() tea.Msg {
+		// 1. Download from source backend
+		handle, err := src.explorer.Download(item.Info.FullPath)
+		if err != nil {
+			return a.newErrorMsg("Copy failed: " + err.Error())
+		}
+
+		// We will collect ALL errors here
+		var errs []string
+
+		// 2. Upload to destination backend
+		dstPath := path.Join(dst.explorer.Cwd(), item.Info.Name)
+		if err := dst.explorer.UploadFrom(handle.Path(), dstPath); err != nil {
+			errs = append(errs, "Copy failed: "+err.Error())
+		}
+
+		// 3. Always close the handle, even if upload failed
+		if err := handle.Close(); err != nil {
+			errs = append(errs, "Cleanup failed: "+err.Error())
+		}
+
+		// 4. Refresh destination pane
+		dst.refresh()
+
+		// 5. If any errors occurred, show them
+		if len(errs) > 0 {
+			return a.newErrorMsg(strings.Join(errs, " | "))
+		}
+
+		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", item.Info.FullPath, dstPath))
+	}
 }
 
 func sameDir(a, b string) bool {
