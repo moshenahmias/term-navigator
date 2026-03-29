@@ -35,7 +35,7 @@ type App struct {
 	lastError   string
 }
 
-func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) App {
+func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) *App {
 	half := width / 2
 	ti := textinput.New()
 	ti.Placeholder = "New name"
@@ -47,7 +47,7 @@ func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) App {
 
 	left.SetActive(true)
 
-	return App{
+	return &App{
 		left:        left,
 		right:       right,
 		focus:       0,
@@ -55,9 +55,9 @@ func NewApp(leftExp, rightExp explorer.FileExplorer, width, height int) App {
 	}
 }
 
-func (a App) Init() tea.Cmd { return nil }
+func (a *App) Init() tea.Cmd { return nil }
 
-func (a App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a *App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	a.renameInput, cmd = a.renameInput.Update(msg)
 
@@ -65,8 +65,13 @@ func (a App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.String() {
 		case "enter":
-			a.applyRename()
 			a.renaming = false
+			if err := a.applyRename(); err != nil {
+				return a, func() tea.Msg {
+					return a.newErrorMsg("Rename failed: " + err.Error())
+				}
+			}
+
 			return a, nil
 
 		case "esc":
@@ -79,7 +84,7 @@ func (a App) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
-func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case ErrorMsg:
@@ -133,95 +138,13 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				active.refresh()
 			}
 		case "f2": // rename
-			pane := a.activePane()
-			item, ok := pane.SelectedItem()
-			if !ok {
-				return a, nil
-			}
+			return a.runRename()
 
-			a.renaming = true
-			a.renameInput.SetValue(item.Info.Name)
-			a.renameInput.Focus()
-
-			return a, nil
 		case "f3": // View
-			pane := a.activePane()
-			item, ok := pane.SelectedItem()
-			if !ok || item.Info.IsDir {
-				return a, nil
-			}
-
-			handle, err := pane.explorer.Download(item.Info.FullPath)
-			if err != nil {
-				return a, func() tea.Msg {
-					return a.newErrorMsg("Download failed: " + err.Error())
-				}
-			}
-
-			cmd := exec.Command("less", handle.Path())
-
-			return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
-				var errs []string
-
-				// 1. less error
-				if procErr != nil {
-					errs = append(errs, "Viewer failed: "+procErr.Error())
-				}
-
-				// 2. cleanup error
-				if err := handle.Close(); err != nil {
-					errs = append(errs, "Cleanup failed: "+err.Error())
-				}
-
-				// 3. return combined error or nil
-				if len(errs) > 0 {
-					return a.newErrorMsg(strings.Join(errs, " | "))
-				}
-
-				return nil
-			})
+			return a.runView()
 
 		case "f4": // Edit
-			pane := a.activePane()
-			item, ok := pane.SelectedItem()
-			if !ok || item.Info.IsDir {
-				return a, nil
-			}
-
-			handle, err := pane.explorer.Download(item.Info.FullPath)
-			if err != nil {
-				return a, func() tea.Msg {
-					return a.newErrorMsg("Download failed: " + err.Error())
-				}
-			}
-
-			cmd := exec.Command("vim", handle.Path())
-
-			return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
-				var errs []string
-
-				// 1. Editor error
-				if procErr != nil {
-					errs = append(errs, "Editor failed: "+procErr.Error())
-				} else {
-					// 2. Upload error (only if editor succeeded)
-					if err := pane.explorer.UploadFrom(handle.Path(), item.Info.FullPath); err != nil {
-						errs = append(errs, "Upload failed: "+err.Error())
-					}
-				}
-
-				// 3. Cleanup error (always attempt)
-				if err := handle.Close(); err != nil {
-					errs = append(errs, "Cleanup failed: "+err.Error())
-				}
-
-				// 4. Return combined error or nil
-				if len(errs) > 0 {
-					return a.newErrorMsg(strings.Join(errs, " | "))
-				}
-
-				return nil
-			})
+			return a.runEdit()
 
 		}
 	}
@@ -238,7 +161,7 @@ func (a App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
-func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if a.renaming {
 		return a.updateRename(msg)
 	}
@@ -246,7 +169,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a.updateMain(msg)
 }
 
-func (a App) View() tea.View {
+func (a *App) View() tea.View {
 	// 1. Render pane content with height constraint (subtract borders)
 	leftContent := lipgloss.NewStyle().
 		MaxHeight(a.left.height - 2).
@@ -320,7 +243,7 @@ func (a *App) activePane() *Pane {
 	return &a.right
 }
 
-func (a App) commandBar() string {
+func (a *App) commandBar() string {
 	key := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#00afff"))
@@ -352,17 +275,17 @@ func (a App) commandBar() string {
 		Render(footer)
 }
 
-func (a *App) applyRename() {
+func (a *App) applyRename() error {
 	pane := a.activePane()
 
 	fi, ok := pane.SelectedItem()
 	if !ok {
-		return
+		return nil
 	}
 
 	newName := a.renameInput.Value()
 	if newName == "" || newName == fi.Info.Name {
-		return
+		return nil
 	}
 
 	// Compute new path/key
@@ -371,20 +294,113 @@ func (a *App) applyRename() {
 
 	// Perform backend rename
 	if err := pane.explorer.Rename(oldPath, newPath); err != nil {
-		// TODO: show error in status bar
-		return
+		return err
 	}
 
 	pane.lastSelectedPath = newPath
 
 	// Refresh pane contents
 	pane.refresh()
+	return nil
 }
 
 type ErrorMsg struct {
 	Text string
 }
 
-func (a App) newErrorMsg(text string) ErrorMsg {
+func (a *App) newErrorMsg(text string) ErrorMsg {
 	return ErrorMsg{Text: text}
+}
+
+func (a *App) runRename() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	if item, ok := pane.SelectedItem(); ok {
+		a.renaming = true
+		a.renameInput.SetValue(item.Info.Name)
+		a.renameInput.Focus()
+
+	}
+
+	return a, nil
+}
+
+func (a *App) runView() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	item, ok := pane.SelectedItem()
+	if !ok || item.Info.IsDir {
+		return a, nil
+	}
+
+	handle, err := pane.explorer.Download(item.Info.FullPath)
+	if err != nil {
+		return a, func() tea.Msg {
+			return a.newErrorMsg("Download failed: " + err.Error())
+		}
+	}
+
+	cmd := exec.Command("less", handle.Path())
+
+	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
+		var errs []string
+
+		// 1. less error
+		if procErr != nil {
+			errs = append(errs, "Viewer failed: "+procErr.Error())
+		}
+
+		// 2. cleanup error
+		if err := handle.Close(); err != nil {
+			errs = append(errs, "Cleanup failed: "+err.Error())
+		}
+
+		// 3. return combined error or nil
+		if len(errs) > 0 {
+			return a.newErrorMsg(strings.Join(errs, " | "))
+		}
+
+		return nil
+	})
+}
+
+func (a *App) runEdit() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	item, ok := pane.SelectedItem()
+	if !ok || item.Info.IsDir {
+		return a, nil
+	}
+
+	handle, err := pane.explorer.Download(item.Info.FullPath)
+	if err != nil {
+		return a, func() tea.Msg {
+			return a.newErrorMsg("Download failed: " + err.Error())
+		}
+	}
+
+	cmd := exec.Command("vim", handle.Path())
+
+	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
+		var errs []string
+
+		// 1. Editor error
+		if procErr != nil {
+			errs = append(errs, "Editor failed: "+procErr.Error())
+		} else {
+			// 2. Upload error (only if editor succeeded)
+			if err := pane.explorer.UploadFrom(handle.Path(), item.Info.FullPath); err != nil {
+				errs = append(errs, "Upload failed: "+err.Error())
+			}
+		}
+
+		// 3. Cleanup error (always attempt)
+		if err := handle.Close(); err != nil {
+			errs = append(errs, "Cleanup failed: "+err.Error())
+		}
+
+		// 4. Return combined error or nil
+		if len(errs) > 0 {
+			return a.newErrorMsg(strings.Join(errs, " | "))
+		}
+
+		return nil
+	})
 }
