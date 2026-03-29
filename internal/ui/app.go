@@ -299,8 +299,9 @@ func (a *App) applyRename() error {
 
 	pane.lastSelectedPath = newPath
 
-	// Refresh pane contents
-	pane.refresh()
+	// Refresh both panes that show this directory
+	a.refreshPanesForPath(filepath.Dir(oldPath))
+
 	return nil
 }
 
@@ -403,4 +404,19 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 
 		return nil
 	})
+}
+
+func sameDir(a, b string) bool {
+	return filepath.Clean(a) == filepath.Clean(b)
+}
+
+func (a *App) refreshPanesForPath(path string) {
+	clean := filepath.Clean(path)
+
+	if sameDir(a.left.explorer.Cwd(), clean) {
+		a.left.refresh()
+	}
+	if sameDir(a.right.explorer.Cwd(), clean) {
+		a.right.refresh()
+	}
 }
