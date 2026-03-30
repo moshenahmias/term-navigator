@@ -134,15 +134,15 @@ func (f *FileItem) Title() string {
 }
 
 func (f *FileItem) Description() string {
-	// Directories: skip size if it's zero
+	t := f.Info.Modified.Local()
+
 	if f.Info.IsDir && f.Info.Size == 0 {
-		return f.Info.Modified.Format("2006-01-02 15:04")
+		return t.Format("2006-01-02 15:04")
 	}
 
-	// Files or dirs with non-zero size
 	return fmt.Sprintf("%d bytes • %s",
 		f.Info.Size,
-		f.Info.Modified.Format("2006-01-02 15:04"))
+		t.Format("2006-01-02 15:04"))
 }
 
 func (f *FileItem) FilterValue() string { return f.Info.Name }
