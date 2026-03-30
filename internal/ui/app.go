@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path"
@@ -70,24 +71,38 @@ type App struct {
 	ctx       context.Context
 }
 
-func NewApp(ctx context.Context, leftExp, rightExp file.Explorer, width, height int) *App {
+func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
+	var leftExp, rightExp file.Explorer
+
+	if exp, exists := devs[left]; exists {
+		leftExp = exp
+	} else {
+		return nil, errors.New("left device not found: " + left)
+	}
+
+	if exp, exists := devs[right]; exists {
+		rightExp = exp
+	} else {
+		return nil, errors.New("right device not found: " + right)
+	}
+
 	half := width / 2
 	ti := textinput.New()
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 
-	left := NewPane(ctx, leftExp, half, height)
-	right := NewPane(ctx, rightExp, half, height)
+	leftPane := NewPane(ctx, leftExp, half, height)
+	rightPane := NewPane(ctx, rightExp, half, height)
 
-	left.SetActive(true)
+	leftPane.SetActive(true)
 
 	return &App{
-		left:    left,
-		right:   right,
+		left:    leftPane,
+		right:   rightPane,
 		focus:   0,
 		textbox: ti,
 		ctx:     ctx,
-	}
+	}, nil
 }
 
 func (a *App) Init() tea.Cmd { return nil }
