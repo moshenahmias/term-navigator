@@ -53,10 +53,18 @@ func (l *explorer) Parent(ctx context.Context) (string, bool) {
 	return parent, true
 }
 
-func (l *explorer) Chdir(_ context.Context, path string) error {
+func (e *explorer) Dir(path string) string {
+	return filepath.Dir(path)
+}
+
+func (e *explorer) Join(dir, name string) string {
+	return filepath.Join(dir, name)
+}
+
+func (l *explorer) Chdir(ctx context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {
-		abs = filepath.Join(l.cwd, path)
+		abs = l.Join(l.cwd, path)
 	}
 
 	info, err := os.Stat(abs)
@@ -71,7 +79,7 @@ func (l *explorer) Chdir(_ context.Context, path string) error {
 	return nil
 }
 
-func (l *explorer) List(context.Context) ([]file.Info, error) {
+func (l *explorer) List(ctx context.Context) ([]file.Info, error) {
 	entries, err := os.ReadDir(l.cwd)
 	if err != nil {
 		return nil, err
@@ -79,7 +87,7 @@ func (l *explorer) List(context.Context) ([]file.Info, error) {
 
 	out := make([]file.Info, 0, len(entries))
 	for _, e := range entries {
-		full := filepath.Join(l.cwd, e.Name())
+		full := l.Join(l.cwd, e.Name())
 
 		lstat, err := os.Lstat(full)
 		if err != nil {
@@ -114,10 +122,10 @@ func (l *explorer) List(context.Context) ([]file.Info, error) {
 	return out, nil
 }
 
-func (l *explorer) Stat(_ context.Context, path string) (file.Info, error) {
+func (l *explorer) Stat(ctx context.Context, path string) (file.Info, error) {
 	abs := path
 	if !filepath.IsAbs(path) {
-		abs = filepath.Join(l.cwd, path)
+		abs = l.Join(l.cwd, path)
 	}
 
 	fi, err := os.Stat(abs)
@@ -159,14 +167,14 @@ func (l *explorer) Read(_ context.Context, path string) (io.ReadCloser, error) {
 	return os.Open(abs)
 }
 
-func (l *explorer) Write(_ context.Context, path string, r io.Reader) error {
+func (l *explorer) Write(ctx context.Context, path string, r io.Reader) error {
 	abs := path
 	if !filepath.IsAbs(path) {
-		abs = filepath.Join(l.cwd, path)
+		abs = l.Join(l.cwd, path)
 	}
 
 	// Ensure parent directory exists
-	if err := os.MkdirAll(filepath.Dir(abs), 0755); err != nil {
+	if err := os.MkdirAll(l.Dir(abs), 0755); err != nil {
 		return err
 	}
 
@@ -180,31 +188,31 @@ func (l *explorer) Write(_ context.Context, path string, r io.Reader) error {
 	return err
 }
 
-func (l *explorer) Delete(_ context.Context, path string) error {
+func (l *explorer) Delete(ctx context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {
-		abs = filepath.Join(l.cwd, path)
+		abs = l.Join(l.cwd, path)
 	}
 	return os.RemoveAll(abs)
 }
 
-func (l *explorer) Mkdir(_ context.Context, path string) error {
+func (l *explorer) Mkdir(ctx context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {
-		abs = filepath.Join(l.cwd, path)
+		abs = l.Join(l.cwd, path)
 	}
 	return os.MkdirAll(abs, 0755)
 }
 
-func (l *explorer) Rename(_ context.Context, oldPath, newPath string) error {
+func (l *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 	absOld := oldPath
 	if !filepath.IsAbs(oldPath) {
-		absOld = filepath.Join(l.cwd, oldPath)
+		absOld = l.Join(l.cwd, oldPath)
 	}
 
 	absNew := newPath
 	if !filepath.IsAbs(newPath) {
-		absNew = filepath.Join(l.cwd, newPath)
+		absNew = l.Join(l.cwd, newPath)
 	}
 
 	return os.Rename(absOld, absNew)
@@ -275,7 +283,7 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 	// CASE 2: Uploading a single file
 	// -----------------------------
 	// Ensure destination directory exists
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+	if err := os.MkdirAll(l.Dir(destPath), 0755); err != nil {
 		return err
 	}
 

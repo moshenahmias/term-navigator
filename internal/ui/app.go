@@ -168,15 +168,21 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 
 		case "enter":
-			pane := a.left
-			if a.focus == 1 {
-				pane = a.right
-			}
+			active := a.activePane() // left or right
 
-			info, err := pane.Selected()
+			info, err := active.Selected()
 			if err == nil && (info.IsDir || info.IsSymlinkToDir) {
-				pane.explorer.Chdir(a.ctx, info.FullPath)
-				pane.refresh()
+				dst := info.FullPath
+				if info.Name == ".." {
+					// Handle parent directory navigation
+					if parent, exists := active.explorer.Parent(a.ctx); exists {
+						dst = parent
+					} else {
+						return a, nil // already at root, do nothing
+					}
+				}
+				active.explorer.Chdir(a.ctx, dst)
+				active.refresh()
 			}
 
 			return a, nil
@@ -412,9 +418,11 @@ func (a *App) applyRename() tea.Cmd {
 		return nil
 	}
 
+	exp := pane.explorer
+
 	// Compute new path/key
 	oldPath := fi.Info.FullPath
-	newPath := path.Join(path.Dir(oldPath), newName)
+	newPath := exp.Join(exp.Dir(oldPath), newName)
 
 	// Perform backend rename
 	if err := pane.explorer.Rename(a.ctx, oldPath, newPath); err != nil {

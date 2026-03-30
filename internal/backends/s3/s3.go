@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -128,6 +130,31 @@ func (e *explorer) Parent(ctx context.Context) (string, bool) {
 	}
 
 	return parent, true
+}
+
+func (e *explorer) Dir(key string) string {
+	trimmed := strings.TrimSuffix(key, "/")
+
+	idx := strings.LastIndex(trimmed, "/")
+	if idx < 0 {
+		return "" // root
+	}
+
+	return trimmed[:idx+1]
+}
+
+func (e *explorer) Join(dir, name string) string {
+	// Ensure dir ends with "/"
+	if dir != "" && !strings.HasSuffix(dir, "/") {
+		dir += "/"
+	}
+
+	// Preserve trailing slash for directories
+	if strings.HasSuffix(name, "/") {
+		return dir + name
+	}
+
+	return dir + name
 }
 
 func (e *explorer) Chdir(ctx context.Context, p string) error {
@@ -333,10 +360,17 @@ func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 		return e.renamePrefix(ctx, src, dst)
 	}
 
+	// Single object rename
+	log.Println(oldPath)
+	log.Println(newPath)
+	copySource := url.PathEscape(e.bucket + "/" + src)
+	log.Println(copySource)
+	log.Println(src)
+	log.Println(dst)
 	// Single object
 	_, err := e.client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(e.bucket),
-		CopySource: aws.String(path.Join(e.bucket, src)),
+		CopySource: aws.String(copySource),
 		Key:        aws.String(dst),
 	})
 	if err != nil {
@@ -448,27 +482,19 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 	return err
 }
 
-func (e *explorer) abs(p string) string {
-	// Normalize slashes
-	p = strings.TrimPrefix(p, "/")
-	p = filepath.ToSlash(p)
-
-	// Empty → return cwd
-	if p == "" {
-		return e.cwd
+func (e *explorer) abs(key string) string {
+	// Already absolute
+	if strings.HasPrefix(key, e.cwd) {
+		return key
 	}
 
-	// If absolute (user passed a full prefix)
-	if strings.HasSuffix(p, "/") {
-		return p
+	// Ensure cwd ends with "/"
+	cwd := e.cwd
+	if cwd != "" && !strings.HasSuffix(cwd, "/") {
+		cwd += "/"
 	}
 
-	// Relative → append to cwd
-	if e.cwd == "" {
-		return p
-	}
-
-	return e.cwd + p
+	return cwd + key
 }
 
 func (e *explorer) deletePrefix(ctx context.Context, prefix string) error {

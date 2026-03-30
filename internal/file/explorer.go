@@ -27,6 +27,8 @@ type Explorer interface {
 	Cwd(ctx context.Context) string
 	IsRoot(ctx context.Context) bool
 	Parent(ctx context.Context) (string, bool)
+	Dir(path string) string
+	Join(dir, name string) string
 	Chdir(ctx context.Context, path string) error
 	List(ctx context.Context) ([]Info, error)
 	Stat(ctx context.Context, path string) (Info, error)
