@@ -41,4 +41,5 @@ type Explorer interface {
 	Rename(ctx context.Context, oldPath, newPath string) error
 	Download(ctx context.Context, path string) (Temp, error)
 	UploadFrom(ctx context.Context, localPath, destPath string) error
+	Metadata(ctx context.Context, path string) (map[string]string, error)
 }

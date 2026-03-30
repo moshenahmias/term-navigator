@@ -135,6 +135,10 @@ func (f *FileItem) isEditable() bool {
 	return !f.Info.IsDir && !f.Info.IsSymlink
 }
 
+func (f *FileItem) hasMetadata() bool {
+	return !f.Info.IsDir || f.Info.Name != ".."
+}
+
 func (f *FileItem) TitleNoIcons() string {
 	name := f.Info.Name
 

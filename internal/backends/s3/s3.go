@@ -80,7 +80,13 @@ func (e *explorer) Cwd(context.Context) string {
 }
 
 func (e *explorer) PrintableCwd(ctx context.Context) string {
-	s := fmt.Sprintf("%s/%s/%s/%s", e.endpoint, e.region, e.bucket, e.Cwd(ctx))
+	var s string
+	if e.region != "" {
+		s = fmt.Sprintf("(%s) %s/%s/%s", e.region, e.endpoint, e.bucket, e.Cwd(ctx))
+	} else {
+		s = fmt.Sprintf("%s/%s/%s", e.endpoint, e.bucket, e.Cwd(ctx))
+	}
+
 	s = strings.ReplaceAll(s, "//", "/")
 	return s
 }
@@ -565,4 +571,34 @@ func (e *explorer) renamePrefix(ctx context.Context, srcPrefix, dstPrefix string
 	}
 
 	return e.deletePrefix(ctx, srcPrefix)
+}
+
+func (s *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {
+	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(path),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	m := map[string]string{
+		"Name":          path,
+		"Bucket":        s.bucket,
+		"Size":          fmt.Sprintf("%d", aws.ToInt64(out.ContentLength)),
+		"Last Modified": out.LastModified.Format(time.RFC3339),
+		"ETag":          aws.ToString(out.ETag),
+		"Content-Type":  aws.ToString(out.ContentType),
+	}
+
+	if s := string(out.StorageClass); s != "" {
+		m["Storage Class"] = s
+	}
+
+	// Add user metadata
+	for k, v := range out.Metadata {
+		m["x-amz-meta-"+k] = v
+	}
+
+	return m, nil
 }

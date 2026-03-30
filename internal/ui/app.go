@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -213,6 +214,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runMakeDir()
 		case "f8":
 			return a.runDelete()
+		case "f9":
+			return a.runMetadata()
 		case "f10":
 			return a, tea.Quit
 
@@ -344,7 +347,7 @@ func (a *App) commandBar() string {
 	item, itemSelected := a.activePane().SelectedItem()
 
 	footer := fmt.Sprintf(
-		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Quit",
+		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Quit",
 		key.Render("F1"),
 		func() lipgloss.Style {
 			if itemSelected && item.isRenamable() {
@@ -389,6 +392,13 @@ func (a *App) commandBar() string {
 
 			return greyed
 		}().Render("F8"),
+		func() lipgloss.Style {
+			if itemSelected && item.hasMetadata() {
+				return key
+			}
+
+			return greyed
+		}().Render("F9"),
 		key.Render("F10"),
 	)
 
@@ -768,6 +778,55 @@ func (a *App) runHelp() (tea.Model, tea.Cmd) {
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			return a.newErrorMsg("Help failed: " + err.Error())
+		}
+		return nil
+	})
+}
+
+func formatMetadata(meta map[string]string) string {
+	var b strings.Builder
+	keys := make([]string, 0, len(meta))
+	for k := range meta {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		fmt.Fprintf(&b, "%s: %s\n", k, meta[k])
+	}
+
+	return b.String()
+}
+
+func (a *App) runMetadata() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	item, ok := pane.SelectedItem()
+	if !ok {
+		return a, nil
+	}
+
+	metadata, err := pane.explorer.Metadata(a.ctx, item.Info.FullPath)
+
+	if err != nil {
+		return a, func() tea.Msg {
+			return a.newErrorMsg("Metadata failed: " + err.Error())
+		}
+	}
+
+	if len(metadata) == 0 {
+		return a, func() tea.Msg {
+			return a.newStatusMsg("No metadata available for " + item.Info.FullPath)
+		}
+	}
+
+	s := formatMetadata(metadata)
+
+	cmd := exec.Command("less", "+1")
+	cmd.Stdin = strings.NewReader(s)
+
+	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return a.newErrorMsg("Viewer failed: " + err.Error())
 		}
 		return nil
 	})

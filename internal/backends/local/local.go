@@ -3,9 +3,11 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
@@ -298,4 +300,43 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 	defer src.Close()
 
 	return l.Write(ctx, destPath, src)
+}
+
+func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+
+	meta := make(map[string]string)
+
+	// Basic info
+	meta["Name"] = info.Name()
+	meta["Size"] = fmt.Sprintf("%d bytes", info.Size())
+	meta["Modified"] = info.ModTime().Format("2006-01-02 15:04:05")
+
+	// File mode (permissions)
+	mode := info.Mode()
+	meta["Mode"] = mode.String() // e.g. "-rw-r--r--"
+	meta["Mode (octal)"] = fmt.Sprintf("%04o", mode.Perm())
+
+	// Type
+	switch {
+	case mode.IsRegular():
+		meta["Type"] = "file"
+	case mode.IsDir():
+		meta["Type"] = "directory"
+	case mode&os.ModeSymlink != 0:
+		meta["Type"] = "symlink"
+	default:
+		meta["Type"] = mode.Type().String()
+	}
+
+	// Owner info (Unix only)
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		meta["UID"] = fmt.Sprintf("%d", stat.Uid)
+		meta["GID"] = fmt.Sprintf("%d", stat.Gid)
+	}
+
+	return meta, nil
 }
