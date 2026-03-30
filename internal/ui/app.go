@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -183,13 +182,13 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case "backspace":
 			active := a.activePane() // left or right
-			cwd := active.explorer.Cwd(a.ctx)
 
-			parent := filepath.Dir(cwd)
-
-			if err := active.explorer.Chdir(a.ctx, parent); err == nil {
-				active.refresh()
+			if parent, exists := active.explorer.Parent(a.ctx); exists {
+				if err := active.explorer.Chdir(a.ctx, parent); err == nil {
+					active.refresh()
+				}
 			}
+
 		case "f1": // Help
 			return a.runHelp()
 		case "f2": // rename

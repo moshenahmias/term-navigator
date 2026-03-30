@@ -41,6 +41,18 @@ func (l *explorer) Cwd(context.Context) string {
 	return l.cwd
 }
 
+func (l *explorer) IsRoot(ctx context.Context) bool {
+	return l.Cwd(ctx) == "/"
+}
+
+func (l *explorer) Parent(ctx context.Context) (string, bool) {
+	if l.IsRoot(ctx) {
+		return "", false
+	}
+	parent := filepath.Dir(l.cwd)
+	return parent, true
+}
+
 func (l *explorer) Chdir(_ context.Context, path string) error {
 	abs := path
 	if !filepath.IsAbs(path) {

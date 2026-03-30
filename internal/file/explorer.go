@@ -25,6 +25,8 @@ type Temp interface {
 type Explorer interface {
 	DeviceID(ctx context.Context) string
 	Cwd(ctx context.Context) string
+	IsRoot(ctx context.Context) bool
+	Parent(ctx context.Context) (string, bool)
 	Chdir(ctx context.Context, path string) error
 	List(ctx context.Context) ([]Info, error)
 	Stat(ctx context.Context, path string) (Info, error)

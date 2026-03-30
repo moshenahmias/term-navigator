@@ -218,7 +218,7 @@ func (p *Pane) refresh() {
 	selectedIndex := 0 // default to first item
 
 	// Add ".." only if not at filesystem root
-	if p.explorer.Cwd(p.ctx) != "/" {
+	if !p.explorer.IsRoot(p.ctx) {
 		upItem := &FileItem{
 			Info: file.Info{
 				Name:     "..",

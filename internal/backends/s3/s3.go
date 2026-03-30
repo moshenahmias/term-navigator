@@ -97,21 +97,53 @@ func (e *explorer) Cwd(context.Context) string {
 	return e.cwd
 }
 
-func (e *explorer) Chdir(ctx context.Context, p string) error {
-	p = strings.TrimPrefix(p, "/")
+func (e *explorer) IsRoot(ctx context.Context) bool {
+	return e.Cwd(ctx) == ""
+}
 
-	var prefix string
-	if p == "" {
-		prefix = ""
-	} else if strings.HasSuffix(p, "/") {
-		prefix = p
-	} else {
-		prefix = p + "/"
+func (e *explorer) Parent(ctx context.Context) (string, bool) {
+	cwd := e.cwd
+
+	// Root has no parent
+	if cwd == "" {
+		return "", false
 	}
 
-	// If relative, prepend cwd
-	if e.cwd != "" && !strings.Contains(prefix, "/") {
-		prefix = e.cwd + prefix
+	// Remove trailing slash
+	trimmed := strings.TrimSuffix(cwd, "/")
+
+	// Find last slash
+	idx := strings.LastIndex(trimmed, "/")
+	if idx < 0 {
+		// Example: "x/" → parent is root ""
+		return "", true
+	}
+
+	// Extract parent prefix
+	parent := trimmed[:idx+1] // already ends with "/"
+
+	// Normalize: collapse accidental double slashes
+	for strings.Contains(parent, "//") {
+		parent = strings.ReplaceAll(parent, "//", "/")
+	}
+
+	return parent, true
+}
+
+func (e *explorer) Chdir(ctx context.Context, p string) error {
+	var prefix string
+
+	// If p is "" or ends with "/", treat it as an absolute prefix
+	if p == "" || strings.HasSuffix(p, "/") {
+		prefix = p
+	} else {
+		// Otherwise treat it as a relative path
+		prefix = e.abs(p)
+	}
+
+	// Normalize: ensure directories end with "/"
+	if prefix != "" && !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
 	}
 
 	// Validate prefix exists
