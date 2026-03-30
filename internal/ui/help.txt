@@ -22,7 +22,9 @@ F5        Copy → other pane
 F6        Move → other pane
 F7        Create directory
 F8        Delete (with confirmation)
-F10       Quit
+F9        Show file info
+F10       Choose device
+F12       Quit
 
 NAVIGATION
 ---------------------------------------------------------------------------------------------------------

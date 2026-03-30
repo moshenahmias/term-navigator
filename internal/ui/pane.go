@@ -206,9 +206,10 @@ type Pane struct {
 	lastSelectedPath string
 	delegate         *ncDelegate
 	ctx              context.Context
+	name             string
 }
 
-func NewPane(ctx context.Context, exp file.Explorer, width, height int) *Pane {
+func NewPane(ctx context.Context, name string, exp file.Explorer, width, height int) *Pane {
 	// Create delegate with NC styles
 	d := ncDelegate{
 		normalStyle: lipgloss.NewStyle().
@@ -238,6 +239,7 @@ func NewPane(ctx context.Context, exp file.Explorer, width, height int) *Pane {
 		height:   height,
 		delegate: &d,
 		ctx:      ctx,
+		name:     name,
 	}
 
 	p.refresh()
@@ -325,7 +327,7 @@ func truncate(s string, width int) string {
 }
 
 func (p *Pane) View() string {
-	cwd := p.explorer.PrintableCwd(p.ctx)
+	cwd := p.name + " " + p.explorer.PrintableCwd(p.ctx)
 	cwd = truncate(cwd, p.width-2) // account for borders
 
 	header := lipgloss.NewStyle().

@@ -37,6 +37,8 @@ var defaultConfig = Config{
 			Type: "local",
 		},
 	},
+	Left:  "default",
+	Right: "default",
 }
 
 func LoadConfig() (*Config, error) {

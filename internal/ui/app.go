@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os/exec"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +24,8 @@ import (
 
 //go:embed help.txt
 var helpText string
+
+const statusMsgDuration = time.Second * 5
 
 var (
 	ncBorder = lipgloss.NewStyle().
@@ -44,6 +48,7 @@ const (
 	inputConfirmDelete
 	inputConfirmCopy
 	inputConfirmMove
+	inputChangeDevice
 )
 
 type inputSettings struct {
@@ -57,6 +62,7 @@ var inputText = map[inputMode]inputSettings{
 	inputConfirmDelete: {text: "Type DELETE to confirm:", placeholder: "DELETE"},
 	inputConfirmCopy:   {text: "Type COPY to confirm:", placeholder: "COPY"},
 	inputConfirmMove:   {text: "Type MOVE to confirm:", placeholder: "MOVE"},
+	inputChangeDevice:  {text: "Enter device name:"},
 }
 
 var _ tea.Model = (*App)(nil)
@@ -70,6 +76,7 @@ type App struct {
 	msg       statusMsg
 	ctx       context.Context
 	devs      map[string]file.Explorer
+	devsHint  string
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -94,18 +101,19 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 
-	leftPane := NewPane(ctx, leftExp, leftWidth, height)
-	rightPane := NewPane(ctx, rightExp, rightWidth, height)
+	leftPane := NewPane(ctx, left, leftExp, leftWidth, height)
+	rightPane := NewPane(ctx, right, rightExp, rightWidth, height)
 
 	leftPane.SetActive(true)
 
 	return &App{
-		left:    leftPane,
-		right:   rightPane,
-		focus:   0,
-		textbox: ti,
-		ctx:     ctx,
-		devs:    devs,
+		left:     leftPane,
+		right:    rightPane,
+		focus:    0,
+		textbox:  ti,
+		ctx:      ctx,
+		devs:     devs,
+		devsHint: strings.Join(slices.Collect(maps.Keys(devs)), ", "),
 	}, nil
 }
 
@@ -137,6 +145,8 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.applyCopy()
 			case inputConfirmMove:
 				return a, a.applyMove()
+			case inputChangeDevice:
+				return a, a.applyChangeDevice()
 			}
 
 			return a, nil
@@ -156,7 +166,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case statusMsg:
 		a.msg = msg
-		return a, tea.Tick(time.Second*2, func(time.Time) tea.Msg {
+		return a, tea.Tick(statusMsgDuration, func(time.Time) tea.Msg {
 			return clearStatusMsg{}
 		})
 	case clearStatusMsg:
@@ -236,6 +246,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f9":
 			return a.runMetadata()
 		case "f10":
+			return a.runChangeDevice()
+		case "f12":
 			return a, tea.Quit
 
 		}
@@ -308,7 +320,10 @@ func (a *App) View() tea.View {
 
 	// 4. Input mode
 	if a.inputMode != inputNone {
-		a.textbox.Placeholder = inputText[a.inputMode].placeholder
+		if placeholder := inputText[a.inputMode].placeholder; placeholder != "" {
+			a.textbox.Placeholder = placeholder
+		}
+
 		inputBox := lipgloss.JoinVertical(
 			lipgloss.Left,
 			panes,
@@ -366,7 +381,7 @@ func (a *App) commandBar() string {
 	item, itemSelected := a.activePane().SelectedItem()
 
 	footer := fmt.Sprintf(
-		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Quit",
+		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Device   %s Quit",
 		key.Render("F1"),
 		func() lipgloss.Style {
 			if itemSelected && item.isRenamable() {
@@ -418,7 +433,14 @@ func (a *App) commandBar() string {
 
 			return greyed
 		}().Render("F9"),
-		key.Render("F10"),
+		func() lipgloss.Style {
+			if len(a.devs) > 1 {
+				return key
+			}
+
+			return greyed
+		}().Render("F10"),
+		key.Render("F12"),
 	)
 
 	return lipgloss.NewStyle().
@@ -644,6 +666,34 @@ func (a *App) applyDelete() tea.Cmd {
 	}
 }
 
+func (a *App) applyChangeDevice() tea.Cmd {
+	pane := a.activePane()
+
+	value := a.textbox.Value()
+
+	if value == "" || value == pane.name {
+		return nil
+	}
+
+	exp, exists := a.devs[value]
+	if !exists {
+		return func() tea.Msg {
+			return a.newErrorMsg(fmt.Sprintf("Device %q not found. Available devices: %s", value, a.devsHint))
+		}
+	}
+
+	pane.explorer = exp
+	pane.name = value
+	pane.lastSelectedPath = ""
+
+	// Refresh both panes that show this directory
+	pane.refresh()
+
+	return func() tea.Msg {
+		return a.newStatusMsg(fmt.Sprintf("Changed device to %q", value))
+	}
+}
+
 func (a *App) newErrorMsg(text string) tea.Msg {
 	return statusMsg{text: text, isErr: true}
 }
@@ -849,6 +899,17 @@ func (a *App) runMetadata() (tea.Model, tea.Cmd) {
 		}
 		return nil
 	})
+}
+
+func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
+	if len(a.devs) > 1 {
+		a.inputMode = inputChangeDevice
+		a.textbox.SetValue("")
+		a.textbox.Placeholder = a.devsHint
+		a.textbox.Focus()
+	}
+
+	return a, nil
 }
 
 func sameDirSameDevice(a, b file.Explorer, ctx context.Context) bool {
