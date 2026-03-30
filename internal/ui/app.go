@@ -156,7 +156,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.Resize(paneWidth, paneHeight)
 		a.right.Resize(paneWidth, paneHeight)
 
-		return a, nil
+		//return a, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -165,7 +165,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.focus = 1 - a.focus
 			a.left.SetActive(a.focus == 0)
 			a.right.SetActive(a.focus == 1)
-			return a, nil
+			//return a, nil
 
 		case "enter":
 			active := a.activePane() // left or right
@@ -185,7 +185,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				active.refresh()
 			}
 
-			return a, nil
+			//return a, nil
 		case "backspace":
 			active := a.activePane() // left or right
 
@@ -219,16 +219,14 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Update focused pane
-	if a.focus == 0 {
-		var cmd tea.Cmd
-		a.left, cmd = a.left.Update(msg)
-		return a, cmd
-	}
+	leftCmd := tea.Cmd(nil)
+	rightCmd := tea.Cmd(nil)
 
-	var cmd tea.Cmd
-	a.right, cmd = a.right.Update(msg)
-	return a, cmd
+	a.left, leftCmd = a.left.Update(msg)
+	a.right, rightCmd = a.right.Update(msg)
+
+	return a, tea.Batch(leftCmd, rightCmd)
+
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

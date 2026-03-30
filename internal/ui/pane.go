@@ -304,17 +304,6 @@ func (p *Pane) refresh() {
 func (p *Pane) Init() tea.Cmd { return nil }
 
 func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		p.width = msg.Width
-		p.height = msg.Height
-
-		// Update list size BEFORE rendering
-		p.list.SetSize(msg.Width, msg.Height-3)
-
-		return p, nil
-	}
-
 	var cmd tea.Cmd
 	p.list, cmd = p.list.Update(msg)
 	return p, cmd
@@ -360,6 +349,7 @@ func (p *Pane) Resize(width, height int) {
 
 	// list must be smaller than pane so border has room
 	p.list.SetSize(width, height-3)
+	p.list.SetShowHelp(p.width > 46) // hide help on very narrow widths
 }
 
 func (p *Pane) SelectedItem() (*FileItem, bool) {
