@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"os"
 	"path"
@@ -361,12 +360,8 @@ func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 	}
 
 	// Single object rename
-	log.Println(oldPath)
-	log.Println(newPath)
 	copySource := url.PathEscape(e.bucket + "/" + src)
-	log.Println(copySource)
-	log.Println(src)
-	log.Println(dst)
+
 	// Single object
 	_, err := e.client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(e.bucket),
@@ -556,12 +551,19 @@ func (e *explorer) renamePrefix(ctx context.Context, srcPrefix, dstPrefix string
 
 		for _, obj := range out.Contents {
 			oldKey := aws.ToString(obj.Key)
+
+			// Compute relative path
 			rel := strings.TrimPrefix(oldKey, srcPrefix)
-			newKey := path.Join(dstPrefix, rel)
+
+			// Correct S3 key join
+			newKey := dstPrefix + rel
+
+			// Correct CopySource
+			copySource := url.PathEscape(e.bucket + "/" + oldKey)
 
 			_, err := e.client.CopyObject(ctx, &s3.CopyObjectInput{
 				Bucket:     aws.String(e.bucket),
-				CopySource: aws.String(path.Join(e.bucket, oldKey)),
+				CopySource: aws.String(copySource),
 				Key:        aws.String(newKey),
 			})
 			if err != nil {
@@ -569,7 +571,7 @@ func (e *explorer) renamePrefix(ctx context.Context, srcPrefix, dstPrefix string
 			}
 		}
 
-		if !*out.IsTruncated {
+		if !aws.ToBool(out.IsTruncated) {
 			break
 		}
 		contToken = out.NextContinuationToken
