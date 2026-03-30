@@ -25,6 +25,7 @@ type Temp interface {
 type Explorer interface {
 	DeviceID(ctx context.Context) string
 	Cwd(ctx context.Context) string
+	PrintableCwd(ctx context.Context) string
 	IsRoot(ctx context.Context) bool
 	Parent(ctx context.Context) (string, bool)
 	Dir(path string) string

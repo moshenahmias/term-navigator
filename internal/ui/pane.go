@@ -137,7 +137,15 @@ func (f *FileItem) Description() string {
 	t := f.Info.Modified.Local()
 
 	if f.Info.IsDir && f.Info.Size == 0 {
+		if t.IsZero() {
+			return ""
+		}
+
 		return t.Format("2006-01-02 15:04")
+	}
+
+	if t.IsZero() {
+		return fmt.Sprintf("%d bytes", f.Info.Size)
 	}
 
 	return fmt.Sprintf("%d bytes • %s",
@@ -177,7 +185,7 @@ func NewPane(ctx context.Context, exp file.Explorer, width, height int) *Pane {
 	styles := list.DefaultStyles(true)
 
 	l.Styles = styles
-	l.Title = exp.Cwd(ctx)
+	l.Title = exp.PrintableCwd(ctx)
 
 	// Build pane
 	p := &Pane{
@@ -265,7 +273,7 @@ func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
 func (p *Pane) View() string {
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Render(p.explorer.Cwd(p.ctx))
+		Render(p.explorer.PrintableCwd(p.ctx))
 
 	body := p.list.View()
 

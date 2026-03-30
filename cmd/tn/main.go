@@ -48,7 +48,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	right := s3exp.NewExplorer(client, "moshe", "/")
+	right := s3exp.NewExplorer(client, "http://localhost:9000", "us-east-1", "moshe", "/")
 
 	p := tea.NewProgram(ui.NewApp(ctx, left, right, 120, 30))
 

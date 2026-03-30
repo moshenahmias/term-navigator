@@ -38,64 +38,51 @@ func (t *tempFile) Close() error {
 }
 
 type explorer struct {
-	client *s3.Client
-	bucket string
-	cwd    string // prefix, always ends with "/" or empty
+	client   *s3.Client
+	bucket   string
+	region   string
+	endpoint string
+	cwd      string // prefix, always ends with "/" or empty
+	id       string
 }
 
 var _ file.Explorer = (*explorer)(nil)
 
-func NewExplorer(client *s3.Client, bucket, startPrefix string) file.Explorer {
+func NewExplorer(client *s3.Client, endpoint, region, bucket, startPrefix string) file.Explorer {
 	p := strings.TrimPrefix(startPrefix, "/")
 	if p != "" && !strings.HasSuffix(p, "/") {
 		p += "/"
 	}
+
+	var id string
+
+	if endpoint != "" {
+		id = fmt.Sprintf("s3:%s/%s/%s", endpoint, region, bucket)
+	} else {
+		id = fmt.Sprintf("s3:%s/%s", region, bucket)
+	}
+
 	return &explorer{
-		client: client,
-		bucket: bucket,
-		cwd:    p,
+		client:   client,
+		bucket:   bucket,
+		endpoint: endpoint,
+		region:   region,
+		cwd:      p,
+		id:       id,
 	}
 }
-
 func (l *explorer) DeviceID(ctx context.Context) string {
-	opt := l.client.Options()
-
-	endpoint := ""
-
-	if opt.EndpointResolverV2 != nil {
-		params := s3.EndpointParameters{
-			Region: aws.String(opt.Region),
-		}
-
-		ep, err := opt.EndpointResolverV2.ResolveEndpoint(ctx, params)
-		if err == nil {
-			host := ep.URI.Hostname()
-			scheme := ep.URI.Scheme
-			port := ep.URI.Port() // <-- string
-			path := ep.URI.Path
-
-			if port != "" {
-				endpoint = fmt.Sprintf("%s://%s:%s%s", scheme, host, port, path)
-			} else {
-				endpoint = fmt.Sprintf("%s://%s%s", scheme, host, path)
-			}
-		}
-	}
-
-	// Fallback for custom endpoints (MinIO, Wasabi, etc.)
-	if endpoint == "" && opt.BaseEndpoint != nil {
-		endpoint = *opt.BaseEndpoint
-	}
-
-	if endpoint == "" {
-		endpoint = "unknown-endpoint"
-	}
-
-	return fmt.Sprintf("s3:%s:%s:%s", endpoint, opt.Region, l.bucket)
+	return l.id
 }
 
 func (e *explorer) Cwd(context.Context) string {
 	return e.cwd
+}
+
+func (e *explorer) PrintableCwd(ctx context.Context) string {
+	s := fmt.Sprintf("%s/%s/%s/%s", e.endpoint, e.region, e.bucket, e.Cwd(ctx))
+	s = strings.ReplaceAll(s, "//", "/")
+	return s
 }
 
 func (e *explorer) IsRoot(ctx context.Context) bool {

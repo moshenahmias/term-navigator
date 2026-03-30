@@ -41,6 +41,10 @@ func (l *explorer) Cwd(context.Context) string {
 	return l.cwd
 }
 
+func (l *explorer) PrintableCwd(ctx context.Context) string {
+	return l.Cwd(ctx)
+}
+
 func (l *explorer) IsRoot(ctx context.Context) bool {
 	return l.Cwd(ctx) == "/"
 }
