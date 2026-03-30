@@ -48,21 +48,60 @@ func (d ncDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 		title += " ↪"
 	}
 
-	// FIX: subtract borders/padding
-	innerWidth := m.Width() - 2 // adjust if you have padding
+	// REAL usable width for charm.land/bubbles/v2
+	innerWidth := m.Width() - 2
+	if innerWidth < 5 { // safety for tiny widths during resize
+		innerWidth = 5
+	}
 
-	titleWidth := lipgloss.Width(title)
-	descWidth := lipgloss.Width(desc)
+	// Measure original widths
+	titleW := lipgloss.Width(title)
+	descW := lipgloss.Width(desc)
 
-	spaces := innerWidth - titleWidth - descWidth
+	// If everything fits, no truncation needed
+	if titleW+1+descW <= innerWidth {
+		spaces := innerWidth - titleW - descW
+		gap := strings.Repeat(" ", spaces)
+		dimDesc := style.Foreground(lipgloss.Color("8")).Render(desc)
+		fmt.Fprint(w, style.Render(title+gap+dimDesc))
+		return
+	}
+
+	// Not enough space → shrink the longer one first
+	available := innerWidth - 1 // reserve 1 space gap
+
+	if titleW > descW {
+		// shrink title first
+		title = truncate(title, available-descW)
+	} else {
+		// shrink desc first
+		desc = truncate(desc, available-titleW)
+	}
+
+	// Recompute widths
+	titleW = lipgloss.Width(title)
+	descW = lipgloss.Width(desc)
+
+	// If still too long, truncate both proportionally
+	if titleW+1+descW > innerWidth {
+		titleMax := innerWidth / 2
+		descMax := innerWidth - titleMax - 1
+
+		title = truncate(title, titleMax)
+		desc = truncate(desc, descMax)
+
+		titleW = lipgloss.Width(title)
+		descW = lipgloss.Width(desc)
+	}
+
+	// Final spacing
+	spaces := innerWidth - titleW - descW
 	if spaces < 1 {
 		spaces = 1
 	}
-
 	gap := strings.Repeat(" ", spaces)
 
 	dimDesc := style.Foreground(lipgloss.Color("8")).Render(desc)
-
 	line := title + gap + dimDesc
 
 	fmt.Fprint(w, style.Render(line))
@@ -265,15 +304,41 @@ func (p *Pane) refresh() {
 func (p *Pane) Init() tea.Cmd { return nil }
 
 func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		p.width = msg.Width
+		p.height = msg.Height
+
+		// Update list size BEFORE rendering
+		p.list.SetSize(msg.Width, msg.Height-3)
+
+		return p, nil
+	}
+
 	var cmd tea.Cmd
 	p.list, cmd = p.list.Update(msg)
 	return p, cmd
 }
 
+func truncate(s string, width int) string {
+	r := []rune(s)
+	if len(r) <= width {
+		return s
+	}
+	if width <= 1 {
+		return "…"
+	}
+	return string(r[:width-1]) + "…"
+}
+
 func (p *Pane) View() string {
+	cwd := p.explorer.PrintableCwd(p.ctx)
+	cwd = truncate(cwd, p.width-2) // account for borders
+
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Render(p.explorer.PrintableCwd(p.ctx))
+		Inline(true).
+		Render(cwd)
 
 	body := p.list.View()
 
