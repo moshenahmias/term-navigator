@@ -33,6 +33,10 @@ func NewExplorer(startPath string) file.Explorer {
 	return &explorer{cwd: abs}
 }
 
+func (l *explorer) DeviceID(context.Context) string {
+	return "local"
+}
+
 func (l *explorer) Cwd(context.Context) string {
 	return l.cwd
 }

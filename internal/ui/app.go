@@ -427,7 +427,7 @@ func (a *App) applyRename() tea.Cmd {
 	pane.lastSelectedPath = newPath
 
 	// Refresh both panes that show this directory
-	a.refreshPanesForPath(filepath.Dir(oldPath))
+	a.refreshPanesForExplorer(pane.explorer)
 
 	return func() tea.Msg {
 		return a.newStatusMsg(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
@@ -548,8 +548,8 @@ func (a *App) applyMove() tea.Cmd {
 		}
 
 		// 5. Refresh both panes that show the source and destination directories
-		a.refreshPanesForPath(src.explorer.Cwd(a.ctx))
-		a.refreshPanesForPath(dst.explorer.Cwd(a.ctx))
+		a.refreshPanesForExplorer(src.explorer)
+		a.refreshPanesForExplorer(dst.explorer)
 
 		// 6. If any errors occurred, show them
 		if len(errs) > 0 {
@@ -572,7 +572,7 @@ func (a *App) applyMakeDir() tea.Cmd {
 
 	// Refresh both panes that show this directory
 	active.lastSelectedPath = newDirPath
-	a.refreshPanesForPath(active.explorer.Cwd(a.ctx))
+	a.refreshPanesForExplorer(active.explorer)
 
 	return func() tea.Msg {
 		return a.newStatusMsg(fmt.Sprintf("Created directory %q", newDirPath))
@@ -603,7 +603,7 @@ func (a *App) applyDelete() tea.Cmd {
 	}
 
 	// Refresh both panes that show this directory
-	a.refreshPanesForPath(pane.explorer.Cwd(a.ctx))
+	a.refreshPanesForExplorer(pane.explorer)
 
 	return func() tea.Msg {
 		return a.newStatusMsg(fmt.Sprintf("Deleted %q", item.Info.FullPath))
@@ -750,7 +750,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 		pane.lastSelectedPath = item.Info.FullPath
 
 		// Refresh both panes that show this directory
-		a.refreshPanesForPath(pane.explorer.Cwd(a.ctx))
+		a.refreshPanesForExplorer(pane.explorer)
 
 		return nil
 	})
@@ -768,17 +768,22 @@ func (a *App) runHelp() (tea.Model, tea.Cmd) {
 	})
 }
 
-func sameDir(a, b string) bool {
-	return filepath.Clean(a) == filepath.Clean(b)
+func sameDirSameDevice(a, b file.Explorer, ctx context.Context) bool {
+	return a.DeviceID(ctx) == b.DeviceID(ctx) &&
+		a.Cwd(ctx) == b.Cwd(ctx)
 }
 
-func (a *App) refreshPanesForPath(path string) {
-	clean := filepath.Clean(path)
+func (a *App) refreshPanesForExplorer(active file.Explorer) {
+	left := a.left.explorer
+	right := a.right.explorer
 
-	if sameDir(a.left.explorer.Cwd(a.ctx), clean) {
+	// Refresh left if needed
+	if left == active || sameDirSameDevice(left, active, a.ctx) {
 		a.left.refresh()
 	}
-	if sameDir(a.right.explorer.Cwd(a.ctx), clean) {
+
+	// Refresh right if needed
+	if right == active || sameDirSameDevice(right, active, a.ctx) {
 		a.right.refresh()
 	}
 }

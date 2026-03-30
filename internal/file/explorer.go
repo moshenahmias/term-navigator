@@ -23,6 +23,7 @@ type Temp interface {
 }
 
 type Explorer interface {
+	DeviceID(ctx context.Context) string
 	Cwd(ctx context.Context) string
 	Chdir(ctx context.Context, path string) error
 	List(ctx context.Context) ([]Info, error)
