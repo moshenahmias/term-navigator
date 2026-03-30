@@ -69,6 +69,7 @@ type App struct {
 	inputMode inputMode
 	msg       statusMsg
 	ctx       context.Context
+	devs      map[string]file.Explorer
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -86,13 +87,15 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 		return nil, errors.New("right device not found: " + right)
 	}
 
-	half := width / 2
+	leftWidth := width / 2
+	rightWidth := width - leftWidth
+
 	ti := textinput.New()
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 
-	leftPane := NewPane(ctx, leftExp, half, height)
-	rightPane := NewPane(ctx, rightExp, half, height)
+	leftPane := NewPane(ctx, leftExp, leftWidth, height)
+	rightPane := NewPane(ctx, rightExp, rightWidth, height)
 
 	leftPane.SetActive(true)
 
@@ -102,6 +105,7 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 		focus:   0,
 		textbox: ti,
 		ctx:     ctx,
+		devs:    devs,
 	}, nil
 }
 
