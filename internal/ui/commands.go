@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -238,6 +239,30 @@ var (
 			active.refresh()
 
 			return nil
+		},
+		"shell": func(a *App, args []string) tea.Cmd {
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: shell")
+				}
+			}
+
+			shell := os.Getenv("SHELL")
+			if shell == "" {
+				shell = "/bin/sh"
+			}
+
+			cmd := exec.Command(shell)
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			return tea.ExecProcess(cmd, func(err error) tea.Msg {
+				if err != nil {
+					return a.newErrorMsg(err.Error())
+				}
+				return a.newStatusMsg("Returned from shell")
+			})
 		},
 	}
 )
