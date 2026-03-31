@@ -23,7 +23,7 @@ var (
 		"rename": func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
 				return func() tea.Msg {
-					return a.newErrorMsg("Usage: rename <old_name> <new_name>")
+					return a.newErrorMsg("Usage: rename <old> <new>")
 				}
 			}
 
@@ -88,6 +88,52 @@ var (
 			from := src.explorer.Join(src.explorer.Cwd(src.ctx), args[0])
 
 			return a.applyMoveInner(src, dst, from, args[1])
+		},
+		"mkdir": func(a *App, args []string) tea.Cmd {
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: mkdir <name>")
+				}
+			}
+
+			return a.applyMakeDir(args[0])
+		},
+		"delete": func(a *App, args []string) tea.Cmd {
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: delete <name>")
+				}
+			}
+
+			return a.applyDeleteInner(a.activePane(), args[0])
+		},
+		"info": func(a *App, args []string) tea.Cmd {
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: info [filename]")
+				}
+			}
+
+			active := a.activePane()
+			_, cmd := a.runMetadataInner(active, args[0])
+			return cmd
+		},
+		"device": func(a *App, args []string) tea.Cmd {
+			if len(a.devs) < 2 {
+				return nil
+			}
+
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: device <name>")
+				}
+			}
+
+			if a.activePane().name == args[0] {
+				return nil
+			}
+
+			return a.applyChangeDevice(args[0])
 		},
 	}
 )

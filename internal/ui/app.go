@@ -61,7 +61,7 @@ const (
 var inputText = map[inputMode]string{
 	inputRename:        "Rename:",
 	inputMkdir:         "New directory name:",
-	inputConfirmDelete: fmt.Sprintf("Type %s to confirm:"),
+	inputConfirmDelete: fmt.Sprintf("Type %s to confirm:", deleteConfirmationText),
 	inputConfirmCopy:   fmt.Sprintf("Type %s to confirm:", copyConfirmationText),
 	inputConfirmMove:   fmt.Sprintf("Type %s to confirm:", moveConfirmationText),
 	inputChangeDevice:  "Switch to:",
@@ -670,7 +670,11 @@ func (a *App) applyDelete(text string) tea.Cmd {
 		}
 	}
 
-	if err := pane.explorer.Delete(a.ctx, item.Info.FullPath); err != nil {
+	return a.applyDeleteInner(pane, item.Info.FullPath)
+}
+
+func (a *App) applyDeleteInner(pane *Pane, target string) tea.Cmd {
+	if err := pane.explorer.Delete(a.ctx, target); err != nil {
 		return func() tea.Msg {
 			return a.newErrorMsg("Delete failed: " + err.Error())
 		}
@@ -680,7 +684,7 @@ func (a *App) applyDelete(text string) tea.Cmd {
 	a.refreshPanesForExplorer(pane.explorer)
 
 	return func() tea.Msg {
-		return a.newStatusMsg(fmt.Sprintf("Deleted %q", item.Info.FullPath))
+		return a.newStatusMsg(fmt.Sprintf("Deleted %q", target))
 	}
 }
 
@@ -907,7 +911,12 @@ func (a *App) runMetadata() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	metadata, err := pane.explorer.Metadata(a.ctx, item.Info.FullPath)
+	return a.runMetadataInner(pane, item.Info.FullPath)
+}
+
+func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
+
+	metadata, err := pane.explorer.Metadata(a.ctx, path)
 
 	if err != nil {
 		return a, func() tea.Msg {
@@ -917,7 +926,7 @@ func (a *App) runMetadata() (tea.Model, tea.Cmd) {
 
 	if len(metadata) == 0 {
 		return a, func() tea.Msg {
-			return a.newStatusMsg("No metadata available for " + item.Info.FullPath)
+			return a.newStatusMsg("No metadata available for " + path)
 		}
 	}
 
