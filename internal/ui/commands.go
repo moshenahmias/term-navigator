@@ -3,10 +3,12 @@ package ui
 import (
 	"fmt"
 	"maps"
+	"os/exec"
 	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/moshenahmias/term-navigator/internal/config"
 )
 
 var (
@@ -34,7 +36,7 @@ var (
 		"view": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return func() tea.Msg {
-					return a.newErrorMsg("Usage: view [filename]")
+					return a.newErrorMsg("Usage: view <filename>")
 				}
 			}
 
@@ -45,7 +47,7 @@ var (
 		"edit": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return func() tea.Msg {
-					return a.newErrorMsg("Usage: edit [filename]")
+					return a.newErrorMsg("Usage: edit <filename>")
 				}
 			}
 
@@ -110,7 +112,7 @@ var (
 		"info": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return func() tea.Msg {
-					return a.newErrorMsg("Usage: info [filename]")
+					return a.newErrorMsg("Usage: info <filename>")
 				}
 			}
 
@@ -134,6 +136,50 @@ var (
 			}
 
 			return a.applyChangeDevice(args[0])
+		},
+		"swap": func(a *App, args []string) tea.Cmd {
+			if len(args) != 0 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: swap")
+				}
+			}
+
+			_, cmd := a.runSwapDevices()
+			return cmd
+		},
+		"exit": func(a *App, args []string) tea.Cmd {
+			if len(args) != 0 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: exit")
+				}
+			}
+
+			return tea.Quit
+		},
+		"config": func(a *App, args []string) tea.Cmd {
+			if len(args) != 0 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: config")
+				}
+			}
+
+			path, err := config.Path()
+
+			if err != nil {
+				return func() tea.Msg {
+					return a.newErrorMsg("Faild to load config file")
+				}
+			}
+
+			cmd := exec.Command("vim", path)
+
+			return tea.ExecProcess(cmd, func(procErr error) tea.Msg {
+				if procErr != nil {
+					return a.newErrorMsg("Faild to load config file")
+				}
+
+				return nil
+			})
 		},
 	}
 )

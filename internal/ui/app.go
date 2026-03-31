@@ -915,7 +915,6 @@ func (a *App) runMetadata() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
-
 	metadata, err := pane.explorer.Metadata(a.ctx, path)
 
 	if err != nil {

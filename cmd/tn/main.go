@@ -8,6 +8,7 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/ui"
 )
@@ -24,14 +25,14 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	cfg, err := LoadConfig()
+	cfg, err := config.Load()
 
 	if err != nil || len(cfg.Devices) == 0 {
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			panic(err)
 		}
 
-		cfg = &defaultConfig
+		cfg = &config.Default
 	}
 
 	devs := make(map[string]file.Explorer, len(cfg.Devices))

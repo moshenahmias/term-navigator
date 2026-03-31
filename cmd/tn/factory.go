@@ -9,19 +9,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	s3exp "github.com/moshenahmias/term-navigator/internal/backends/s3"
+	appcfg "github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
 var (
-	factory = map[string]func(ctx context.Context, dev *DeviceConfig) (file.Explorer, error){
-		"local": func(ctx context.Context, dev *DeviceConfig) (file.Explorer, error) {
+	factory = map[string]func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error){
+		"local": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
 			path := dev.Path
 			if path == "" {
 				path = "."
 			}
 			return local.NewExplorer(path), nil
 		},
-		"s3": func(ctx context.Context, dev *DeviceConfig) (file.Explorer, error) {
+		"s3": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
 			// Build options dynamically
 			opts := []func(*config.LoadOptions) error{}
 

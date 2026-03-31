@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -30,7 +30,7 @@ type DeviceConfig struct {
 	Endpoint string `json:"endpoint,omitempty"`
 }
 
-var defaultConfig = Config{
+var Default = Config{
 	Devices: []DeviceConfig{
 		{
 			Name: "default",
@@ -41,13 +41,22 @@ var defaultConfig = Config{
 	Right: "default",
 }
 
-func LoadConfig() (*Config, error) {
+func Path() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	path := filepath.Join(home, defaultConfigName)
+	return path, nil
+}
+
+func Load() (*Config, error) {
+	path, err := Path()
+
+	if err != nil {
+		return nil, err
+	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
