@@ -248,8 +248,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f10":
 			return a.runChangeDevice()
 		case "f12":
-			return a, tea.Quit
-
+			return a.runSwapDevices()
 		}
 	}
 
@@ -381,7 +380,7 @@ func (a *App) commandBar() string {
 	item, itemSelected := a.activePane().SelectedItem()
 
 	footer := fmt.Sprintf(
-		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Device   %s Quit",
+		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Device   %s Swap   %s Quit",
 		key.Render("F1"),
 		func() lipgloss.Style {
 			if itemSelected && item.isRenamable() {
@@ -440,7 +439,14 @@ func (a *App) commandBar() string {
 
 			return greyed
 		}().Render("F10"),
-		key.Render("F12"),
+		func() lipgloss.Style {
+			if len(a.devs) > 1 && a.left.name != a.right.name {
+				return key
+			}
+
+			return greyed
+		}().Render("F12"),
+		key.Render("ESC"),
 	)
 
 	return lipgloss.NewStyle().
@@ -907,6 +913,19 @@ func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
 		a.textbox.SetValue("")
 		a.textbox.Placeholder = a.devsHint
 		a.textbox.Focus()
+	}
+
+	return a, nil
+}
+
+func (a *App) runSwapDevices() (tea.Model, tea.Cmd) {
+	if len(a.devs) > 1 && a.left.name != a.right.name {
+		a.left, a.right = a.right, a.left
+		a.focus = 1 - a.focus // switch focus to the other pane
+
+		// Refresh both panes to reflect new devices
+		a.refreshPanesForExplorer(a.left.explorer)
+		a.refreshPanesForExplorer(a.right.explorer)
 	}
 
 	return a, nil
