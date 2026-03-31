@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"fmt"
 	"maps"
 	"os/exec"
@@ -69,7 +70,7 @@ var (
 				dst = a.right
 			}
 
-			from := src.explorer.Join(src.explorer.Cwd(src.ctx), args[0])
+			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
 
 			return a.applyCopyInner(src, dst, from, args[1])
 		},
@@ -87,7 +88,7 @@ var (
 				dst = a.right
 			}
 
-			from := src.explorer.Join(src.explorer.Cwd(src.ctx), args[0])
+			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
 
 			return a.applyMoveInner(src, dst, from, args[1])
 		},
@@ -175,11 +176,68 @@ var (
 
 			return tea.ExecProcess(cmd, func(procErr error) tea.Msg {
 				if procErr != nil {
-					return a.newErrorMsg("Faild to load config file")
+					return a.newErrorMsg(procErr.Error())
 				}
 
 				return nil
 			})
+		},
+		"exec": func(a *App, args []string) tea.Cmd {
+			if len(args) == 0 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: exec <command>")
+				}
+			}
+
+			cmd := exec.Command(args[0], args[1:]...)
+			var out bytes.Buffer
+			cmd.Stdout = &out
+
+			return tea.ExecProcess(cmd, func(procErr error) tea.Msg {
+				if procErr != nil {
+					return a.newErrorMsg(procErr.Error())
+				}
+				msg := strings.ReplaceAll(out.String(), "\r\n", " ")
+				msg = strings.ReplaceAll(msg, "\r", " ")
+				msg = strings.ReplaceAll(msg, "\n", " ")
+				return a.newStatusMsg(msg)
+			})
+		},
+		"refresh": func(a *App, args []string) tea.Cmd {
+			a.left.refresh()
+			a.right.refresh()
+			return nil
+		},
+		"cd": func(a *App, args []string) tea.Cmd {
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: cd <folder>")
+				}
+			}
+
+			active := a.activePane()
+
+			var path string
+
+			if args[0] == ".." {
+				if parent, ok := active.explorer.Parent(a.ctx); ok {
+					path = parent
+				} else {
+					return nil
+				}
+			} else {
+				path = active.explorer.Join(active.explorer.Cwd(a.ctx), args[0])
+			}
+
+			if err := active.explorer.Chdir(a.ctx, path); err != nil {
+				return func() tea.Msg {
+					return a.newErrorMsg(err.Error())
+				}
+			}
+
+			active.refresh()
+
+			return nil
 		},
 	}
 )
