@@ -295,8 +295,11 @@ func (p *Pane) refresh() {
 
 		// 🔥 If this item matches the renamed path, remember its index
 		if p.lastSelectedPath != "" && fi.FullPath == p.lastSelectedPath {
-			// +1 because ".." shifts everything down
-			selectedIndex = i + 1
+			if p.explorer.IsRoot(p.ctx) {
+				selectedIndex = i
+			} else {
+				selectedIndex = i + 1 // +1 because of ".."
+			}
 		}
 	}
 
