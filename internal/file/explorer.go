@@ -23,6 +23,7 @@ type Temp interface {
 }
 
 type Explorer interface {
+	Copy() Explorer
 	DeviceID(ctx context.Context) string
 	Cwd(ctx context.Context) string
 	PrintableCwd(ctx context.Context) string

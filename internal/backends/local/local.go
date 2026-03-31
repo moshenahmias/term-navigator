@@ -35,6 +35,11 @@ func NewExplorer(startPath string) file.Explorer {
 	return &explorer{cwd: abs}
 }
 
+func (l *explorer) Copy() file.Explorer {
+	cp := *l // shallow copy
+	return &cp
+}
+
 func (l *explorer) DeviceID(context.Context) string {
 	return "local"
 }
@@ -242,9 +247,32 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 		return nil
 	}
 
-	info, err := os.Stat(localPath)
+	info, err := os.Lstat(localPath)
 	if err != nil {
 		return err
+	}
+
+	// -----------------------------
+	// CASE 0: Uploading a symlink
+	// -----------------------------
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(localPath)
+		if err != nil {
+			return err
+		}
+
+		// Convert relative symlink to absolute
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(localPath), target)
+			target = filepath.Clean(target)
+		}
+
+		// Ensure destination directory exists
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return err
+		}
+
+		return os.Symlink(target, destPath)
 	}
 
 	// -----------------------------

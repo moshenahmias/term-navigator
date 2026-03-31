@@ -71,8 +71,14 @@ func NewExplorer(client *s3.Client, endpoint, region, bucket, startPrefix string
 		id:       id,
 	}
 }
-func (l *explorer) DeviceID(ctx context.Context) string {
-	return l.id
+
+func (e *explorer) Copy() file.Explorer {
+	cp := *e // shallow copy
+	return &cp
+}
+
+func (e *explorer) DeviceID(ctx context.Context) string {
+	return e.id
 }
 
 func (e *explorer) Cwd(context.Context) string {

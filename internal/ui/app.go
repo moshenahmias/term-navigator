@@ -52,26 +52,20 @@ const (
 	inputCommand
 )
 
-type inputSettings struct {
-	text        string
-	placeholder string
-	suggestions []string
-}
-
 const (
 	deleteConfirmationText = "DELETE"
 	copyConfirmationText   = "COPY"
 	moveConfirmationText   = "MOVE"
 )
 
-var inputText = map[inputMode]inputSettings{
-	inputRename:        {text: "Rename:", placeholder: "New name"},
-	inputMkdir:         {text: "New directory name:", placeholder: "Directory name"},
-	inputConfirmDelete: {text: fmt.Sprintf("Type %s to confirm:", deleteConfirmationText), placeholder: deleteConfirmationText, suggestions: []string{deleteConfirmationText}},
-	inputConfirmCopy:   {text: fmt.Sprintf("Type %s to confirm:", copyConfirmationText), placeholder: copyConfirmationText, suggestions: []string{copyConfirmationText}},
-	inputConfirmMove:   {text: fmt.Sprintf("Type %s to confirm:", moveConfirmationText), placeholder: moveConfirmationText, suggestions: []string{moveConfirmationText}},
-	inputChangeDevice:  {text: "Switch to:"},
-	inputCommand:       {text: "Type help for available commands:"},
+var inputText = map[inputMode]string{
+	inputRename:        "Rename:",
+	inputMkdir:         "New directory name:",
+	inputConfirmDelete: fmt.Sprintf("Type %s to confirm:"),
+	inputConfirmCopy:   fmt.Sprintf("Type %s to confirm:", copyConfirmationText),
+	inputConfirmMove:   fmt.Sprintf("Type %s to confirm:", moveConfirmationText),
+	inputChangeDevice:  "Switch to:",
+	inputCommand:       "Type help for available commands:",
 }
 
 var _ tea.Model = (*App)(nil)
@@ -131,15 +125,8 @@ func (a *App) Init() tea.Cmd { return nil }
 
 func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
 	a.textbox, cmd = a.textbox.Update(msg)
-
-	if placeholder := inputText[a.inputMode].placeholder; placeholder != "" {
-		a.textbox.Placeholder = placeholder
-	}
-
-	if suggestions := inputText[a.inputMode].suggestions; len(suggestions) > 0 {
-		a.textbox.SetSuggestions(suggestions)
-	}
 
 	switch m := msg.(type) {
 	case tea.KeyMsg:
@@ -340,7 +327,7 @@ func (a *App) View() tea.View {
 		inputBox := lipgloss.JoinVertical(
 			lipgloss.Left,
 			panes,
-			inputText[a.inputMode].text,
+			inputText[a.inputMode],
 			a.textbox.View(),
 		)
 		v := tea.NewView(inputBox)
@@ -522,12 +509,6 @@ func (a *App) applyCopy(text string) tea.Cmd {
 		dst = a.right
 	}
 
-	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
-		return func() tea.Msg {
-			return a.newErrorMsg("Source and destination are the same")
-		}
-	}
-
 	item, ok := src.SelectedItem()
 	if !ok || !item.isCopyable() {
 		return nil
@@ -539,9 +520,19 @@ func (a *App) applyCopy(text string) tea.Cmd {
 		}
 	}
 
+	return a.applyCopyInner(src, dst, item.Info.FullPath, item.Info.Name)
+}
+
+func (a *App) applyCopyInner(src, dst *Pane, from, name string) tea.Cmd {
+	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
+		return func() tea.Msg {
+			return a.newErrorMsg("Source and destination are the same")
+		}
+	}
+
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(a.ctx, item.Info.FullPath)
+		handle, err := src.explorer.Download(a.ctx, from)
 		if err != nil {
 			return a.newErrorMsg("Copy failed: " + err.Error())
 		}
@@ -550,7 +541,8 @@ func (a *App) applyCopy(text string) tea.Cmd {
 		var errs []string
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(a.ctx), item.Info.Name)
+		dstPath := path.Join(dst.explorer.Cwd(a.ctx), name)
+
 		if err := dst.explorer.UploadFrom(a.ctx, handle.Path(), dstPath); err != nil {
 			errs = append(errs, "Copy failed: "+err.Error())
 		}
@@ -568,7 +560,7 @@ func (a *App) applyCopy(text string) tea.Cmd {
 			return a.newErrorMsg(strings.Join(errs, " | "))
 		}
 
-		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", item.Info.FullPath, dstPath))
+		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
 	}
 }
 
@@ -703,7 +695,7 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 		}
 	}
 
-	pane.explorer = exp
+	pane.explorer = exp.Copy()
 	pane.name = text
 	pane.lastSelectedPath = ""
 
@@ -728,6 +720,7 @@ func (a *App) runRename() (tea.Model, tea.Cmd) {
 	if item, ok := pane.SelectedItem(); ok && item.isRenamable() {
 		a.inputMode = inputRename
 		a.textbox.SetValue(item.Info.Name)
+		a.textbox.Placeholder = "New name"
 		a.textbox.Focus()
 	}
 
@@ -739,6 +732,8 @@ func (a *App) runCopy() (tea.Model, tea.Cmd) {
 	if item, ok := pane.SelectedItem(); ok && item.isCopyable() {
 		a.inputMode = inputConfirmCopy
 		a.textbox.SetValue("")
+		a.textbox.Placeholder = copyConfirmationText
+		a.textbox.SetSuggestions([]string{copyConfirmationText})
 		a.textbox.Focus()
 	}
 
@@ -750,6 +745,8 @@ func (a *App) runMove() (tea.Model, tea.Cmd) {
 	if item, ok := pane.SelectedItem(); ok && item.isMoveable() {
 		a.inputMode = inputConfirmMove
 		a.textbox.SetValue("")
+		a.textbox.Placeholder = moveConfirmationText
+		a.textbox.SetSuggestions([]string{moveConfirmationText})
 		a.textbox.Focus()
 	}
 
@@ -759,6 +756,7 @@ func (a *App) runMove() (tea.Model, tea.Cmd) {
 func (a *App) runMakeDir() (tea.Model, tea.Cmd) {
 	a.inputMode = inputMkdir
 	a.textbox.SetValue("New Folder")
+	a.textbox.Placeholder = "Directory name"
 	a.textbox.Focus()
 
 	return a, nil
@@ -769,6 +767,8 @@ func (a *App) runDelete() (tea.Model, tea.Cmd) {
 	if item, ok := pane.SelectedItem(); ok && item.isDeleteable() {
 		a.inputMode = inputConfirmDelete
 		a.textbox.SetValue("")
+		a.textbox.Placeholder = deleteConfirmationText
+		a.textbox.SetSuggestions([]string{deleteConfirmationText})
 		a.textbox.Focus()
 	}
 
@@ -827,7 +827,6 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
-
 	handle, err := pane.explorer.Download(a.ctx, filename)
 	if err != nil {
 		return a, func() tea.Msg {

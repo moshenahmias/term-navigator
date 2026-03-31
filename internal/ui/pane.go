@@ -112,15 +112,15 @@ type FileItem struct {
 }
 
 func (f *FileItem) isDeleteable() bool {
-	return (!f.Info.IsDir || f.Info.Name != "..") && !f.Info.IsSymlinkToDir
+	return !f.Info.IsDir || f.Info.Name != ".."
 }
 
 func (f *FileItem) isRenamable() bool {
-	return (!f.Info.IsDir || f.Info.Name != "..") && !f.Info.IsSymlinkToDir
+	return !f.Info.IsDir || f.Info.Name != ".."
 }
 
 func (f *FileItem) isCopyable() bool {
-	return (!f.Info.IsDir || f.Info.Name != "..") && !f.Info.IsSymlinkToDir
+	return !f.Info.IsDir || f.Info.Name != ".."
 }
 
 func (f *FileItem) isMoveable() bool {
