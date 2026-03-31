@@ -469,7 +469,6 @@ func (a *App) commandBar() string {
 		Padding(0, 1).
 		Render(footer)
 }
-
 func (a *App) applyRename(text string) tea.Cmd {
 	pane := a.activePane()
 
@@ -486,14 +485,19 @@ func (a *App) applyRename(text string) tea.Cmd {
 		return nil
 	}
 
+	oldPath := fi.Info.FullPath
+
+	return a.applyRenameInner(pane, oldPath, text)
+}
+
+func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 	exp := pane.explorer
 
 	// Compute new path/key
-	oldPath := fi.Info.FullPath
-	newPath := exp.Join(exp.Dir(oldPath), text)
+	newPath := exp.Join(exp.Dir(oldPath), name)
 
 	// Perform backend rename
-	if err := pane.explorer.Rename(a.ctx, oldPath, newPath); err != nil {
+	if err := exp.Rename(a.ctx, oldPath, newPath); err != nil {
 		return func() tea.Msg {
 			return a.newErrorMsg("Rename failed: " + err.Error())
 		}
@@ -502,7 +506,7 @@ func (a *App) applyRename(text string) tea.Cmd {
 	pane.lastSelectedPath = newPath
 
 	// Refresh both panes that show this directory
-	a.refreshPanesForExplorer(pane.explorer)
+	a.refreshPanesForExplorer(exp)
 
 	return func() tea.Msg {
 		return a.newStatusMsg(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
@@ -711,10 +715,6 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 	}
 }
 
-func (a *App) applyCommand(text string) tea.Cmd {
-	return nil
-}
-
 func (a *App) newErrorMsg(text string) tea.Msg {
 	return statusMsg{text: text, isErr: true}
 }
@@ -774,7 +774,6 @@ func (a *App) runDelete() (tea.Model, tea.Cmd) {
 
 	return a, nil
 }
-
 func (a *App) runView() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
@@ -782,7 +781,11 @@ func (a *App) runView() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	handle, err := pane.explorer.Download(a.ctx, item.Info.FullPath)
+	return a.runViewInner(pane, item.Info.FullPath)
+}
+
+func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
+	handle, err := pane.explorer.Download(a.ctx, filename)
 	if err != nil {
 		return a, func() tea.Msg {
 			return a.newErrorMsg("Download failed: " + err.Error())
@@ -820,7 +823,12 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	handle, err := pane.explorer.Download(a.ctx, item.Info.FullPath)
+	return a.runEditInner(pane, item.Info.FullPath)
+}
+
+func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
+
+	handle, err := pane.explorer.Download(a.ctx, filename)
 	if err != nil {
 		return a, func() tea.Msg {
 			return a.newErrorMsg("Download failed: " + err.Error())
@@ -837,7 +845,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 			errs = append(errs, "Editor failed: "+procErr.Error())
 		} else {
 			// 2. Upload error (only if editor succeeded)
-			if err := pane.explorer.UploadFrom(a.ctx, handle.Path(), item.Info.FullPath); err != nil {
+			if err := pane.explorer.UploadFrom(a.ctx, handle.Path(), filename); err != nil {
 				errs = append(errs, "Upload failed: "+err.Error())
 			}
 		}
@@ -852,7 +860,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 			return a.newErrorMsg(strings.Join(errs, " | "))
 		}
 
-		pane.lastSelectedPath = item.Info.FullPath
+		pane.lastSelectedPath = filename
 
 		// Refresh both panes that show this directory
 		a.refreshPanesForExplorer(pane.explorer)
@@ -943,27 +951,6 @@ func (a *App) runSwapDevices() (tea.Model, tea.Cmd) {
 		a.refreshPanesForExplorer(a.left.explorer)
 		a.refreshPanesForExplorer(a.right.explorer)
 	}
-
-	return a, nil
-}
-
-var commands = []string{"cd"}
-
-func (a *App) runCommand() (tea.Model, tea.Cmd) {
-	a.inputMode = inputCommand
-	a.textbox.SetValue("")
-
-	suggestions := slices.Clone(commands)
-
-	if active := a.activePane(); active != nil {
-		for _, item := range active.list.Items() {
-			suggestions = append(suggestions, item.(*FileItem).Info.Name)
-		}
-	}
-
-	a.textbox.SetSuggestions(suggestions)
-
-	a.textbox.Focus()
 
 	return a, nil
 }
