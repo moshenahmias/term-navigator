@@ -49,6 +49,7 @@ const (
 	inputConfirmCopy
 	inputConfirmMove
 	inputChangeDevice
+	inputCommand
 )
 
 type inputSettings struct {
@@ -70,6 +71,7 @@ var inputText = map[inputMode]inputSettings{
 	inputConfirmCopy:   {text: fmt.Sprintf("Type %s to confirm:", copyConfirmationText), placeholder: copyConfirmationText, suggestions: []string{copyConfirmationText}},
 	inputConfirmMove:   {text: fmt.Sprintf("Type %s to confirm:", moveConfirmationText), placeholder: moveConfirmationText, suggestions: []string{moveConfirmationText}},
 	inputChangeDevice:  {text: "Switch to:"},
+	inputCommand:       {text: "Type help for available commands:"},
 }
 
 var _ tea.Model = (*App)(nil)
@@ -152,17 +154,19 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch currentInput {
 			case inputRename:
-				return a, a.applyRename()
+				return a, a.applyRename(a.textbox.Value())
 			case inputMkdir:
-				return a, a.applyMakeDir()
+				return a, a.applyMakeDir(a.textbox.Value())
 			case inputConfirmDelete:
-				return a, a.applyDelete()
+				return a, a.applyDelete(a.textbox.Value())
 			case inputConfirmCopy:
-				return a, a.applyCopy()
+				return a, a.applyCopy(a.textbox.Value())
 			case inputConfirmMove:
-				return a, a.applyMove()
+				return a, a.applyMove(a.textbox.Value())
 			case inputChangeDevice:
-				return a, a.applyChangeDevice()
+				return a, a.applyChangeDevice(a.textbox.Value())
+			case inputCommand:
+				return a, a.applyCommand(a.textbox.Value())
 			}
 
 			return a, nil
@@ -261,6 +265,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runChangeDevice()
 		case "f12":
 			return a.runSwapDevices()
+		case ":":
+			return a.runCommand()
 		}
 	}
 
@@ -464,7 +470,7 @@ func (a *App) commandBar() string {
 		Render(footer)
 }
 
-func (a *App) applyRename() tea.Cmd {
+func (a *App) applyRename(text string) tea.Cmd {
 	pane := a.activePane()
 
 	fi, ok := pane.SelectedItem()
@@ -476,8 +482,7 @@ func (a *App) applyRename() tea.Cmd {
 		return nil
 	}
 
-	newName := a.textbox.Value()
-	if newName == "" || newName == fi.Info.Name {
+	if text == "" || text == fi.Info.Name {
 		return nil
 	}
 
@@ -485,7 +490,7 @@ func (a *App) applyRename() tea.Cmd {
 
 	// Compute new path/key
 	oldPath := fi.Info.FullPath
-	newPath := exp.Join(exp.Dir(oldPath), newName)
+	newPath := exp.Join(exp.Dir(oldPath), text)
 
 	// Perform backend rename
 	if err := pane.explorer.Rename(a.ctx, oldPath, newPath); err != nil {
@@ -504,7 +509,7 @@ func (a *App) applyRename() tea.Cmd {
 	}
 }
 
-func (a *App) applyCopy() tea.Cmd {
+func (a *App) applyCopy(text string) tea.Cmd {
 	src := a.activePane()
 
 	// pick destination pane
@@ -524,7 +529,7 @@ func (a *App) applyCopy() tea.Cmd {
 		return nil
 	}
 
-	if a.textbox.Value() != copyConfirmationText {
+	if text != copyConfirmationText {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
 		}
@@ -563,7 +568,7 @@ func (a *App) applyCopy() tea.Cmd {
 	}
 }
 
-func (a *App) applyMove() tea.Cmd {
+func (a *App) applyMove(text string) tea.Cmd {
 	src := a.activePane()
 
 	// pick destination pane
@@ -583,7 +588,7 @@ func (a *App) applyMove() tea.Cmd {
 		return nil
 	}
 
-	if a.textbox.Value() != moveConfirmationText {
+	if text != moveConfirmationText {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
 		}
@@ -630,9 +635,9 @@ func (a *App) applyMove() tea.Cmd {
 	}
 }
 
-func (a *App) applyMakeDir() tea.Cmd {
+func (a *App) applyMakeDir(text string) tea.Cmd {
 	active := a.activePane()
-	newDirPath := path.Join(active.explorer.Cwd(a.ctx), a.textbox.Value())
+	newDirPath := path.Join(active.explorer.Cwd(a.ctx), text)
 
 	if err := active.explorer.Mkdir(a.ctx, newDirPath); err != nil {
 		return func() tea.Msg {
@@ -649,7 +654,7 @@ func (a *App) applyMakeDir() tea.Cmd {
 	}
 }
 
-func (a *App) applyDelete() tea.Cmd {
+func (a *App) applyDelete(text string) tea.Cmd {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
 	if !ok {
@@ -660,7 +665,7 @@ func (a *App) applyDelete() tea.Cmd {
 		return nil
 	}
 
-	if a.textbox.Value() != deleteConfirmationText {
+	if text != deleteConfirmationText {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
 		}
@@ -680,32 +685,34 @@ func (a *App) applyDelete() tea.Cmd {
 	}
 }
 
-func (a *App) applyChangeDevice() tea.Cmd {
+func (a *App) applyChangeDevice(text string) tea.Cmd {
 	pane := a.activePane()
 
-	value := a.textbox.Value()
-
-	if value == "" || value == pane.name {
+	if text == "" || text == pane.name {
 		return nil
 	}
 
-	exp, exists := a.devs[value]
+	exp, exists := a.devs[text]
 	if !exists {
 		return func() tea.Msg {
-			return a.newErrorMsg(fmt.Sprintf("Device %q not found. Available devices: %s", value, a.devsHint))
+			return a.newErrorMsg(fmt.Sprintf("Device %q not found. Available devices: %s", text, a.devsHint))
 		}
 	}
 
 	pane.explorer = exp
-	pane.name = value
+	pane.name = text
 	pane.lastSelectedPath = ""
 
 	// Refresh both panes that show this directory
 	pane.refresh()
 
 	return func() tea.Msg {
-		return a.newStatusMsg(fmt.Sprintf("Changed device to %q", value))
+		return a.newStatusMsg(fmt.Sprintf("Changed device to %q", text))
 	}
+}
+
+func (a *App) applyCommand(text string) tea.Cmd {
+	return nil
 }
 
 func (a *App) newErrorMsg(text string) tea.Msg {
@@ -936,6 +943,27 @@ func (a *App) runSwapDevices() (tea.Model, tea.Cmd) {
 		a.refreshPanesForExplorer(a.left.explorer)
 		a.refreshPanesForExplorer(a.right.explorer)
 	}
+
+	return a, nil
+}
+
+var commands = []string{"cd"}
+
+func (a *App) runCommand() (tea.Model, tea.Cmd) {
+	a.inputMode = inputCommand
+	a.textbox.SetValue("")
+
+	suggestions := slices.Clone(commands)
+
+	if active := a.activePane(); active != nil {
+		for _, item := range active.list.Items() {
+			suggestions = append(suggestions, item.(*FileItem).Info.Name)
+		}
+	}
+
+	a.textbox.SetSuggestions(suggestions)
+
+	a.textbox.Focus()
 
 	return a, nil
 }
