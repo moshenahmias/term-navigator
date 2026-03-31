@@ -69,7 +69,7 @@ var inputText = map[inputMode]inputSettings{
 	inputConfirmDelete: {text: fmt.Sprintf("Type %s to confirm:", deleteConfirmationText), placeholder: deleteConfirmationText, suggestions: []string{deleteConfirmationText}},
 	inputConfirmCopy:   {text: fmt.Sprintf("Type %s to confirm:", copyConfirmationText), placeholder: copyConfirmationText, suggestions: []string{copyConfirmationText}},
 	inputConfirmMove:   {text: fmt.Sprintf("Type %s to confirm:", moveConfirmationText), placeholder: moveConfirmationText, suggestions: []string{moveConfirmationText}},
-	inputChangeDevice:  {text: "Enter device name:"},
+	inputChangeDevice:  {text: "Switch to:"},
 }
 
 var _ tea.Model = (*App)(nil)
@@ -202,8 +202,6 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.Resize(paneWidth, paneHeight)
 		a.right.Resize(paneWidth, paneHeight)
 
-		//return a, nil
-
 	case tea.KeyMsg:
 		switch msg.String() {
 
@@ -230,7 +228,6 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				active.refresh()
 			}
 
-			//return a, nil
 		case "backspace":
 			active := a.activePane() // left or right
 
