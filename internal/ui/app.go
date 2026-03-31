@@ -54,14 +54,21 @@ const (
 type inputSettings struct {
 	text        string
 	placeholder string
+	suggestions []string
 }
+
+const (
+	deleteConfirmationText = "DELETE"
+	copyConfirmationText   = "COPY"
+	moveConfirmationText   = "MOVE"
+)
 
 var inputText = map[inputMode]inputSettings{
 	inputRename:        {text: "Rename:", placeholder: "New name"},
 	inputMkdir:         {text: "New directory name:", placeholder: "Directory name"},
-	inputConfirmDelete: {text: "Type DELETE to confirm:", placeholder: "DELETE"},
-	inputConfirmCopy:   {text: "Type COPY to confirm:", placeholder: "COPY"},
-	inputConfirmMove:   {text: "Type MOVE to confirm:", placeholder: "MOVE"},
+	inputConfirmDelete: {text: fmt.Sprintf("Type %s to confirm:", deleteConfirmationText), placeholder: deleteConfirmationText, suggestions: []string{deleteConfirmationText}},
+	inputConfirmCopy:   {text: fmt.Sprintf("Type %s to confirm:", copyConfirmationText), placeholder: copyConfirmationText, suggestions: []string{copyConfirmationText}},
+	inputConfirmMove:   {text: fmt.Sprintf("Type %s to confirm:", moveConfirmationText), placeholder: moveConfirmationText, suggestions: []string{moveConfirmationText}},
 	inputChangeDevice:  {text: "Enter device name:"},
 }
 
@@ -100,6 +107,7 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 	ti := textinput.New()
 	ti.CharLimit = 256
 	ti.SetWidth(40)
+	ti.ShowSuggestions = true
 
 	leftPane := NewPane(ctx, left, leftExp, leftWidth, height)
 	rightPane := NewPane(ctx, right, rightExp, rightWidth, height)
@@ -122,6 +130,14 @@ func (a *App) Init() tea.Cmd { return nil }
 func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	a.textbox, cmd = a.textbox.Update(msg)
+
+	if placeholder := inputText[a.inputMode].placeholder; placeholder != "" {
+		a.textbox.Placeholder = placeholder
+	}
+
+	if suggestions := inputText[a.inputMode].suggestions; len(suggestions) > 0 {
+		a.textbox.SetSuggestions(suggestions)
+	}
 
 	switch m := msg.(type) {
 	case tea.KeyMsg:
@@ -195,7 +211,6 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.focus = 1 - a.focus
 			a.left.SetActive(a.focus == 0)
 			a.right.SetActive(a.focus == 1)
-			//return a, nil
 
 		case "enter":
 			active := a.activePane() // left or right
@@ -319,10 +334,6 @@ func (a *App) View() tea.View {
 
 	// 4. Input mode
 	if a.inputMode != inputNone {
-		if placeholder := inputText[a.inputMode].placeholder; placeholder != "" {
-			a.textbox.Placeholder = placeholder
-		}
-
 		inputBox := lipgloss.JoinVertical(
 			lipgloss.Left,
 			panes,
@@ -516,7 +527,7 @@ func (a *App) applyCopy() tea.Cmd {
 		return nil
 	}
 
-	if a.textbox.Value() != "COPY" {
+	if a.textbox.Value() != copyConfirmationText {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
 		}
@@ -575,7 +586,7 @@ func (a *App) applyMove() tea.Cmd {
 		return nil
 	}
 
-	if a.textbox.Value() != "MOVE" {
+	if a.textbox.Value() != moveConfirmationText {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
 		}
@@ -652,7 +663,7 @@ func (a *App) applyDelete() tea.Cmd {
 		return nil
 	}
 
-	if a.textbox.Value() != "DELETE" {
+	if a.textbox.Value() != deleteConfirmationText {
 		return func() tea.Msg {
 			return a.newErrorMsg("confirmation text does not match")
 		}
@@ -911,6 +922,7 @@ func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
 	if len(a.devs) > 1 {
 		a.inputMode = inputChangeDevice
 		a.textbox.SetValue("")
+		a.textbox.SetSuggestions(slices.Collect(maps.Keys(a.devs)))
 		a.textbox.Placeholder = a.devsHint
 		a.textbox.Focus()
 	}
