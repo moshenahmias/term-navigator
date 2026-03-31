@@ -12,39 +12,30 @@ import (
 var (
 	commands = map[string]func(*App, []string) tea.Cmd{
 		"help": func(a *App, args []string) tea.Cmd {
+			if len(args) != 0 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: help")
+				}
+			}
 			_, cmd := a.runHelp()
 			return cmd
 		},
 		"rename": func(a *App, args []string) tea.Cmd {
-			if len(args) > 2 || len(args) == 0 {
+			if len(args) != 2 {
 				return func() tea.Msg {
-					return a.newErrorMsg("Usage: rename <new_name> (or rename <old_name> <new_name>)")
+					return a.newErrorMsg("Usage: rename <old_name> <new_name>")
 				}
 			}
 
 			active := a.activePane()
 
-			if len(args) == 1 {
-				if item, ok := active.SelectedItem(); ok && item.isRenamable() {
-					return a.applyRename(args[0])
-				}
-				return func() tea.Msg {
-					return a.newErrorMsg("No renamable item selected")
-				}
-			}
-
 			return a.applyRenameInner(active, args[0], args[1])
 		},
 		"view": func(a *App, args []string) tea.Cmd {
-			if len(args) > 1 {
+			if len(args) != 1 {
 				return func() tea.Msg {
 					return a.newErrorMsg("Usage: view [filename]")
 				}
-			}
-
-			if len(args) == 0 {
-				_, cmd := a.runView()
-				return cmd
 			}
 
 			active := a.activePane()
@@ -52,20 +43,51 @@ var (
 			return cmd
 		},
 		"edit": func(a *App, args []string) tea.Cmd {
-			if len(args) > 1 {
+			if len(args) != 1 {
 				return func() tea.Msg {
 					return a.newErrorMsg("Usage: edit [filename]")
 				}
 			}
 
-			if len(args) == 0 {
-				_, cmd := a.runEdit()
-				return cmd
-			}
-
 			active := a.activePane()
 			_, cmd := a.runEditInner(active, args[0])
 			return cmd
+		},
+		"copy": func(a *App, args []string) tea.Cmd {
+			if len(args) != 2 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: copy <src> <dest>")
+				}
+			}
+
+			src := a.activePane()
+			dst := a.left
+
+			if src == a.left {
+				dst = a.right
+			}
+
+			from := src.explorer.Join(src.explorer.Cwd(src.ctx), args[0])
+
+			return a.applyCopyInner(src, dst, from, args[1])
+		},
+		"move": func(a *App, args []string) tea.Cmd {
+			if len(args) != 2 {
+				return func() tea.Msg {
+					return a.newErrorMsg("Usage: move <src> <dest>")
+				}
+			}
+
+			src := a.activePane()
+			dst := a.left
+
+			if src == a.left {
+				dst = a.right
+			}
+
+			from := src.explorer.Join(src.explorer.Cwd(src.ctx), args[0])
+
+			return a.applyMoveInner(src, dst, from, args[1])
 		},
 	}
 )
@@ -84,6 +106,7 @@ func (a *App) runCommand() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	a.textbox.Placeholder = ""
 	a.textbox.SetSuggestions(suggestions)
 	a.textbox.Focus()
 

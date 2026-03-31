@@ -563,7 +563,6 @@ func (a *App) applyCopyInner(src, dst *Pane, from, name string) tea.Cmd {
 		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
 	}
 }
-
 func (a *App) applyMove(text string) tea.Cmd {
 	src := a.activePane()
 
@@ -571,12 +570,6 @@ func (a *App) applyMove(text string) tea.Cmd {
 	dst := a.left
 	if src == a.left {
 		dst = a.right
-	}
-
-	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
-		return func() tea.Msg {
-			return a.newErrorMsg("Source and destination are the same")
-		}
 	}
 
 	item, ok := src.SelectedItem()
@@ -590,9 +583,19 @@ func (a *App) applyMove(text string) tea.Cmd {
 		}
 	}
 
+	return a.applyMoveInner(src, dst, item.Info.FullPath, item.Info.Name)
+}
+
+func (a *App) applyMoveInner(src, dst *Pane, from, name string) tea.Cmd {
+	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
+		return func() tea.Msg {
+			return a.newErrorMsg("Source and destination are the same")
+		}
+	}
+
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(a.ctx, item.Info.FullPath)
+		handle, err := src.explorer.Download(a.ctx, from)
 		if err != nil {
 			return a.newErrorMsg("Move failed: " + err.Error())
 		}
@@ -601,7 +604,7 @@ func (a *App) applyMove(text string) tea.Cmd {
 		var errs []string
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(a.ctx), item.Info.Name)
+		dstPath := path.Join(dst.explorer.Cwd(a.ctx), name)
 		if err := dst.explorer.UploadFrom(a.ctx, handle.Path(), dstPath); err != nil {
 			errs = append(errs, "Move failed: "+err.Error())
 		}
@@ -613,7 +616,7 @@ func (a *App) applyMove(text string) tea.Cmd {
 
 		// 4. Attempt to delete source (only if download/upload succeeded)
 		if len(errs) == 0 {
-			if err := src.explorer.Delete(a.ctx, item.Info.FullPath); err != nil {
+			if err := src.explorer.Delete(a.ctx, from); err != nil {
 				errs = append(errs, "Delete failed: "+err.Error())
 			}
 		}
@@ -627,7 +630,7 @@ func (a *App) applyMove(text string) tea.Cmd {
 			return a.newErrorMsg(strings.Join(errs, " | "))
 		}
 
-		return a.newStatusMsg(fmt.Sprintf("Moved %q to %q", item.Info.FullPath, dstPath))
+		return a.newStatusMsg(fmt.Sprintf("Moved %q to %q", from, dstPath))
 	}
 }
 
@@ -721,6 +724,7 @@ func (a *App) runRename() (tea.Model, tea.Cmd) {
 		a.inputMode = inputRename
 		a.textbox.SetValue(item.Info.Name)
 		a.textbox.Placeholder = "New name"
+		a.textbox.SetSuggestions(nil)
 		a.textbox.Focus()
 	}
 
@@ -757,6 +761,7 @@ func (a *App) runMakeDir() (tea.Model, tea.Cmd) {
 	a.inputMode = inputMkdir
 	a.textbox.SetValue("New Folder")
 	a.textbox.Placeholder = "Directory name"
+	a.textbox.SetSuggestions(nil)
 	a.textbox.Focus()
 
 	return a, nil
