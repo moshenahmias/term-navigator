@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 
@@ -35,18 +36,26 @@ func run(ctx context.Context) error {
 
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
-	for _, devCfg := range cfg.Devices {
+	for i, devCfg := range cfg.Devices {
+
+		if devCfg.Name == "" {
+			return fmt.Errorf("device %d missing name", i)
+		}
+		if devCfg.Type == "" {
+			return fmt.Errorf("device %d (%s) missing type", i, devCfg.Name)
+		}
+
 		constructor, ok := factory[devCfg.Type]
 		if !ok {
 			return errors.New("unknown device type: " + devCfg.Type)
 		}
 		dev, err := constructor(ctx, &devCfg)
 		if err != nil {
-			return errors.New("failed to create device: " + err.Error())
+			return fmt.Errorf("failed to create device %d (%s): %w", i, devCfg.Name, err)
 		}
 
 		if _, exists := devs[devCfg.Name]; exists {
-			return errors.New("duplicate device name: " + devCfg.Name)
+			return fmt.Errorf("duplicate device name: %s", devCfg.Name)
 		}
 
 		devs[devCfg.Name] = dev
