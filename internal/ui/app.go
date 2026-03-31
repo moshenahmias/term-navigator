@@ -205,20 +205,25 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			active := a.activePane() // left or right
 
 			info, err := active.Selected()
-			if err == nil && (info.IsDir || info.IsSymlinkToDir) {
-				dst := info.FullPath
-				if info.Name == ".." {
-					// Handle parent directory navigation
-					if parent, exists := active.explorer.Parent(a.ctx); exists {
-						dst = parent
-					} else {
-						return a, nil // already at root, do nothing
-					}
-				}
-				active.explorer.Chdir(a.ctx, dst)
-				active.refresh()
-			}
 
+			if err == nil {
+				dst := info.FullPath
+				if info.IsDir || info.IsSymlinkToDir {
+					if info.Name == ".." {
+						// Handle parent directory navigation
+						if parent, exists := active.explorer.Parent(a.ctx); exists {
+							dst = parent
+						} else {
+							return a, nil // already at root, do nothing
+						}
+					}
+					active.explorer.Chdir(a.ctx, dst)
+					active.refresh()
+				} else {
+					// file
+					return a.runOpen(active, dst)
+				}
+			}
 		case "backspace":
 			active := a.activePane() // left or right
 
@@ -485,9 +490,7 @@ func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 
 	// Perform backend rename
 	if err := exp.Rename(a.ctx, oldPath, newPath); err != nil {
-		return func() tea.Msg {
-			return a.newErrorMsg("Rename failed: " + err.Error())
-		}
+		return check(err)
 	}
 
 	pane.lastSelectedPath = newPath
@@ -495,9 +498,7 @@ func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 	// Refresh both panes that show this directory
 	a.refreshPanesForExplorer(exp)
 
-	return func() tea.Msg {
-		return a.newStatusMsg(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
-	}
+	return status(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
 }
 
 func (a *App) applyCopy(text string) tea.Cmd {
@@ -515,9 +516,7 @@ func (a *App) applyCopy(text string) tea.Cmd {
 	}
 
 	if text != copyConfirmationText {
-		return func() tea.Msg {
-			return a.newErrorMsg("confirmation text does not match")
-		}
+		return failure("confirmation text does not match")
 	}
 
 	return a.applyCopyInner(src, dst, item.Info.FullPath, item.Info.Name)
@@ -525,16 +524,14 @@ func (a *App) applyCopy(text string) tea.Cmd {
 
 func (a *App) applyCopyInner(src, dst *Pane, from, name string) tea.Cmd {
 	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
-		return func() tea.Msg {
-			return a.newErrorMsg("Source and destination are the same")
-		}
+		return failure("Source and destination are the same")
 	}
 
 	return func() tea.Msg {
 		// 1. Download from source backend
 		handle, err := src.explorer.Download(a.ctx, from)
 		if err != nil {
-			return a.newErrorMsg("Copy failed: " + err.Error())
+			return check(err)
 		}
 
 		// We will collect ALL errors here
@@ -557,10 +554,10 @@ func (a *App) applyCopyInner(src, dst *Pane, from, name string) tea.Cmd {
 
 		// 5. If any errors occurred, show them
 		if len(errs) > 0 {
-			return a.newErrorMsg(strings.Join(errs, " | "))
+			return failure(strings.Join(errs, " | "))
 		}
 
-		return a.newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
+		return status(fmt.Sprintf("Copied %q to %q", from, dstPath))
 	}
 }
 func (a *App) applyMove(text string) tea.Cmd {
@@ -578,9 +575,7 @@ func (a *App) applyMove(text string) tea.Cmd {
 	}
 
 	if text != moveConfirmationText {
-		return func() tea.Msg {
-			return a.newErrorMsg("confirmation text does not match")
-		}
+		return failure("confirmation text does not match")
 	}
 
 	return a.applyMoveInner(src, dst, item.Info.FullPath, item.Info.Name)
@@ -588,16 +583,14 @@ func (a *App) applyMove(text string) tea.Cmd {
 
 func (a *App) applyMoveInner(src, dst *Pane, from, name string) tea.Cmd {
 	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
-		return func() tea.Msg {
-			return a.newErrorMsg("Source and destination are the same")
-		}
+		return failure("Source and destination are the same")
 	}
 
 	return func() tea.Msg {
 		// 1. Download from source backend
 		handle, err := src.explorer.Download(a.ctx, from)
 		if err != nil {
-			return a.newErrorMsg("Move failed: " + err.Error())
+			return check(err)
 		}
 
 		// We will collect ALL errors here
@@ -627,10 +620,10 @@ func (a *App) applyMoveInner(src, dst *Pane, from, name string) tea.Cmd {
 
 		// 6. If any errors occurred, show them
 		if len(errs) > 0 {
-			return a.newErrorMsg(strings.Join(errs, " | "))
+			return failure(strings.Join(errs, " | "))
 		}
 
-		return a.newStatusMsg(fmt.Sprintf("Moved %q to %q", from, dstPath))
+		return status(fmt.Sprintf("Moved %q to %q", from, dstPath))
 	}
 }
 
@@ -639,18 +632,14 @@ func (a *App) applyMakeDir(text string) tea.Cmd {
 	newDirPath := path.Join(active.explorer.Cwd(a.ctx), text)
 
 	if err := active.explorer.Mkdir(a.ctx, newDirPath); err != nil {
-		return func() tea.Msg {
-			return a.newErrorMsg("Mkdir failed: " + err.Error())
-		}
+		return check(err)
 	}
 
 	// Refresh both panes that show this directory
 	active.lastSelectedPath = newDirPath
 	a.refreshPanesForExplorer(active.explorer)
 
-	return func() tea.Msg {
-		return a.newStatusMsg(fmt.Sprintf("Created directory %q", newDirPath))
-	}
+	return status(fmt.Sprintf("Created directory %q", newDirPath))
 }
 
 func (a *App) applyDelete(text string) tea.Cmd {
@@ -665,9 +654,7 @@ func (a *App) applyDelete(text string) tea.Cmd {
 	}
 
 	if text != deleteConfirmationText {
-		return func() tea.Msg {
-			return a.newErrorMsg("confirmation text does not match")
-		}
+		return failure("confirmation text does not match")
 	}
 
 	return a.applyDeleteInner(pane, item.Info.FullPath)
@@ -675,17 +662,13 @@ func (a *App) applyDelete(text string) tea.Cmd {
 
 func (a *App) applyDeleteInner(pane *Pane, target string) tea.Cmd {
 	if err := pane.explorer.Delete(a.ctx, target); err != nil {
-		return func() tea.Msg {
-			return a.newErrorMsg("Delete failed: " + err.Error())
-		}
+		return check(err)
 	}
 
 	// Refresh both panes that show this directory
 	a.refreshPanesForExplorer(pane.explorer)
 
-	return func() tea.Msg {
-		return a.newStatusMsg(fmt.Sprintf("Deleted %q", target))
-	}
+	return status(fmt.Sprintf("Deleted %q", target))
 }
 
 func (a *App) applyChangeDevice(text string) tea.Cmd {
@@ -697,9 +680,7 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 
 	exp, exists := a.devs[text]
 	if !exists {
-		return func() tea.Msg {
-			return a.newErrorMsg(fmt.Sprintf("Device %q not found. Available devices: %s", text, a.devsHint))
-		}
+		return failure(fmt.Sprintf("Device %q not found. Available devices: %s", text, a.devsHint))
 	}
 
 	pane.explorer = exp.Copy()
@@ -709,17 +690,21 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 	// Refresh both panes that show this directory
 	pane.refresh()
 
-	return func() tea.Msg {
-		return a.newStatusMsg(fmt.Sprintf("Changed device to %q", text))
+	return status(fmt.Sprintf("Changed device to %q", text))
+}
+
+func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
+	handle, err := pane.explorer.Download(a.ctx, path)
+	if err != nil {
+		return a, check(err)
 	}
-}
 
-func (a *App) newErrorMsg(text string) tea.Msg {
-	return statusMsg{text: text, isErr: true}
-}
+	cmd := exec.Command("open", handle.Path())
 
-func (a *App) newStatusMsg(text string) tea.Msg {
-	return statusMsg{text: text, isErr: false}
+	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
+		defer handle.Close()
+		return check(err)
+	})
 }
 
 func (a *App) runRename() (tea.Model, tea.Cmd) {
@@ -796,9 +781,7 @@ func (a *App) runView() (tea.Model, tea.Cmd) {
 func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	handle, err := pane.explorer.Download(a.ctx, filename)
 	if err != nil {
-		return a, func() tea.Msg {
-			return a.newErrorMsg("Download failed: " + err.Error())
-		}
+		return a, check(err)
 	}
 
 	cmd := exec.Command("less", "+1", handle.Path())
@@ -818,7 +801,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 3. return combined error or nil
 		if len(errs) > 0 {
-			return a.newErrorMsg(strings.Join(errs, " | "))
+			return failure(strings.Join(errs, " | "))
 		}
 
 		return nil
@@ -838,9 +821,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	handle, err := pane.explorer.Download(a.ctx, filename)
 	if err != nil {
-		return a, func() tea.Msg {
-			return a.newErrorMsg("Download failed: " + err.Error())
-		}
+		return a, check(err)
 	}
 
 	cmd := exec.Command("vim", handle.Path())
@@ -865,7 +846,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 4. Return combined error or nil
 		if len(errs) > 0 {
-			return a.newErrorMsg(strings.Join(errs, " | "))
+			return failure(strings.Join(errs, " | "))
 		}
 
 		pane.lastSelectedPath = filename
@@ -883,7 +864,7 @@ func (a *App) runHelp() (tea.Model, tea.Cmd) {
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
-			return a.newErrorMsg("Help failed: " + err.Error())
+			return check(err)
 		}
 		return nil
 	})
@@ -918,15 +899,11 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 	metadata, err := pane.explorer.Metadata(a.ctx, path)
 
 	if err != nil {
-		return a, func() tea.Msg {
-			return a.newErrorMsg("Metadata failed: " + err.Error())
-		}
+		return a, check(err)
 	}
 
 	if len(metadata) == 0 {
-		return a, func() tea.Msg {
-			return a.newStatusMsg("No metadata available for " + path)
-		}
+		return a, failure("No metadata available for " + path)
 	}
 
 	s := formatMetadata(metadata)
@@ -934,12 +911,7 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 	cmd := exec.Command("less", "+1")
 	cmd.Stdin = strings.NewReader(s)
 
-	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			return a.newErrorMsg("Viewer failed: " + err.Error())
-		}
-		return nil
-	})
+	return a, tea.ExecProcess(cmd, execCheck())
 }
 
 func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {

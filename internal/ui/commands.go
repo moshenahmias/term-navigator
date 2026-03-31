@@ -17,18 +17,14 @@ var (
 	commands = map[string]func(*App, []string) tea.Cmd{
 		"help": func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: help")
-				}
+				return failure("Usage: help")
 			}
 			_, cmd := a.runHelp()
 			return cmd
 		},
 		"rename": func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: rename <old> <new>")
-				}
+				return failure("Usage: rename <old> <new>")
 			}
 
 			active := a.activePane()
@@ -37,9 +33,7 @@ var (
 		},
 		"view": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: view <filename>")
-				}
+				return failure("Usage: view <filename>")
 			}
 
 			active := a.activePane()
@@ -48,9 +42,7 @@ var (
 		},
 		"edit": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: edit <filename>")
-				}
+				return failure("Usage: edit <filename>")
 			}
 
 			active := a.activePane()
@@ -59,9 +51,7 @@ var (
 		},
 		"copy": func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: copy <src> <dest>")
-				}
+				return failure("Usage: copy <src> <dest>")
 			}
 
 			src := a.activePane()
@@ -77,9 +67,7 @@ var (
 		},
 		"move": func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: move <src> <dest>")
-				}
+				return failure("Usage: move <src> <dest>")
 			}
 
 			src := a.activePane()
@@ -95,27 +83,21 @@ var (
 		},
 		"mkdir": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: mkdir <name>")
-				}
+				return failure("Usage: mkdir <name>")
 			}
 
 			return a.applyMakeDir(args[0])
 		},
 		"delete": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: delete <name>")
-				}
+				return failure("Usage: delete <name>")
 			}
 
 			return a.applyDeleteInner(a.activePane(), args[0])
 		},
 		"info": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: info <filename>")
-				}
+				return failure("Usage: info <filename>")
 			}
 
 			active := a.activePane()
@@ -128,9 +110,7 @@ var (
 			}
 
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: device <name>")
-				}
+				return failure("Usage: device <name>")
 			}
 
 			if a.activePane().name == args[0] {
@@ -141,9 +121,7 @@ var (
 		},
 		"swap": func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: swap")
-				}
+				return failure("Usage: swap")
 			}
 
 			_, cmd := a.runSwapDevices()
@@ -151,57 +129,43 @@ var (
 		},
 		"exit": func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: exit")
-				}
+				return failure("Usage: exit")
 			}
 
 			return tea.Quit
 		},
 		"config": func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: config")
-				}
+				return failure("Usage: config")
 			}
 
 			path, err := config.Path()
 
 			if err != nil {
-				return func() tea.Msg {
-					return a.newErrorMsg("Faild to load config file")
-				}
+				return check(err)
 			}
 
 			cmd := exec.Command("vim", path)
 
-			return tea.ExecProcess(cmd, func(procErr error) tea.Msg {
-				if procErr != nil {
-					return a.newErrorMsg(procErr.Error())
-				}
-
-				return nil
-			})
+			return tea.ExecProcess(cmd, execCheck())
 		},
 		"exec": func(a *App, args []string) tea.Cmd {
 			if len(args) == 0 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: exec <command>")
-				}
+				return failure("Usage: exec <command>")
 			}
 
 			cmd := exec.Command(args[0], args[1:]...)
 			var out bytes.Buffer
 			cmd.Stdout = &out
 
-			return tea.ExecProcess(cmd, func(procErr error) tea.Msg {
-				if procErr != nil {
-					return a.newErrorMsg(procErr.Error())
+			return tea.ExecProcess(cmd, func(err error) tea.Msg {
+				if err != nil {
+					return check(err)
 				}
 				msg := strings.ReplaceAll(out.String(), "\r\n", " ")
 				msg = strings.ReplaceAll(msg, "\r", " ")
 				msg = strings.ReplaceAll(msg, "\n", " ")
-				return a.newStatusMsg(msg)
+				return newStatusMsg(msg)
 			})
 		},
 		"refresh": func(a *App, args []string) tea.Cmd {
@@ -211,9 +175,7 @@ var (
 		},
 		"cd": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
-				return func() tea.Msg {
-					return a.newErrorMsg("Usage: cd <folder>")
-				}
+				return failure("Usage: cd <folder>")
 			}
 
 			active := a.activePane()
@@ -231,9 +193,7 @@ var (
 			}
 
 			if err := active.explorer.Chdir(a.ctx, path); err != nil {
-				return func() tea.Msg {
-					return a.newErrorMsg(err.Error())
-				}
+				return check(err)
 			}
 
 			active.refresh()
@@ -243,7 +203,7 @@ var (
 		"shell": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return func() tea.Msg {
-					return a.newErrorMsg("Usage: shell")
+					return newErrorMsg("Usage: shell")
 				}
 			}
 
@@ -257,12 +217,7 @@ var (
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 
-			return tea.ExecProcess(cmd, func(err error) tea.Msg {
-				if err != nil {
-					return a.newErrorMsg(err.Error())
-				}
-				return a.newStatusMsg("Returned from shell")
-			})
+			return tea.ExecProcess(cmd, execResolve("Returned from shell"))
 		},
 	}
 )
@@ -302,7 +257,5 @@ func (a *App) applyCommand(text string) tea.Cmd {
 	if cmd, exists := commands[args[0]]; exists {
 		return cmd(a, args[1:])
 	}
-	return func() tea.Msg {
-		return a.newErrorMsg(fmt.Sprintf("Unknown command: %q", args[0]))
-	}
+	return failure(fmt.Sprintf("Unknown command: %q", args[0]))
 }
