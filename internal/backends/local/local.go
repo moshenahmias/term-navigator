@@ -356,6 +356,9 @@ func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string
 		meta["Type"] = "directory"
 	case mode&os.ModeSymlink != 0:
 		meta["Type"] = "symlink"
+		if target, err := os.Readlink(path); err == nil {
+			meta["Target"] = target
+		}
 	default:
 		meta["Type"] = mode.Type().String()
 	}
