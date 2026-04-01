@@ -335,7 +335,7 @@ func (p *Pane) View() string {
 
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Inline(true).
+		Inline(true).Faint(!p.delegate.active).
 		Render(cwd)
 
 	body := p.list.View()
