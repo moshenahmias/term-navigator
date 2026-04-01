@@ -145,7 +145,7 @@ var (
 				return check(err)
 			}
 
-			cmd := exec.Command("vim", path)
+			cmd := exec.Command("vim", path, "-c", "silent %!jq .")
 
 			return tea.ExecProcess(cmd, execCheck())
 		},
