@@ -71,6 +71,8 @@ var inputText = map[inputMode]string{
 var _ tea.Model = (*App)(nil)
 
 type App struct {
+	width     int
+	height    int
 	left      *Pane
 	right     *Pane
 	focus     int // 0 = left, 1 = right
@@ -183,6 +185,9 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		totalWidth := msg.Width
 		totalHeight := msg.Height
+
+		a.width = totalWidth
+		a.height = totalHeight
 
 		// subtract 2 columns for each pane border
 		paneWidth := (totalWidth / 2)
@@ -456,10 +461,13 @@ func (a *App) commandBar() string {
 	)
 
 	return lipgloss.NewStyle().
+		Width(a.width).         // total terminal width
+		Align(lipgloss.Center). // center horizontally
 		Background(lipgloss.Color("#222")).
 		Foreground(lipgloss.Color("#ccc")).
 		Padding(0, 1).
 		Render(footer)
+
 }
 func (a *App) applyRename(text string) tea.Cmd {
 	pane := a.activePane()
