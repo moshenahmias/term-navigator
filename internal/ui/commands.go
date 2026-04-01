@@ -220,6 +220,14 @@ var (
 			return tea.ExecProcess(cmd, execResolve("Returned from shell"))
 		},
 	}
+	commandAlias = map[string]string{
+		"cp":   "copy",
+		"quit": "exit",
+		"mv":   "move",
+		"dev":  "device",
+		"del":  "delete",
+		"cfg":  "config",
+	}
 )
 
 func (a *App) runCommand() (tea.Model, tea.Cmd) {
@@ -254,8 +262,15 @@ func (a *App) applyCommand(text string) tea.Cmd {
 		return nil
 	}
 
-	if cmd, exists := commands[args[0]]; exists {
+	name := args[0]
+
+	if s, exists := commandAlias[name]; exists {
+		name = s
+	}
+
+	if cmd, exists := commands[name]; exists {
 		return cmd(a, args[1:])
 	}
+
 	return failure(fmt.Sprintf("Unknown command: %q", args[0]))
 }
