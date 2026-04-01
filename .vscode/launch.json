@@ -6,7 +6,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/tn",
+            "program": "${workspaceFolder}/cmd/termnav",
             "console": "externalTerminal"
         }
     ]

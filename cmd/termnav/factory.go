@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/moshenahmias/term-navigator/internal/backends/fakefs"
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	s3exp "github.com/moshenahmias/term-navigator/internal/backends/s3"
 	appcfg "github.com/moshenahmias/term-navigator/internal/config"
@@ -21,6 +22,9 @@ var (
 				path = "."
 			}
 			return local.NewExplorer(path), nil
+		},
+		"fakefs": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
+			return fakefs.NewExplorer(), nil
 		},
 		"s3": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
 			// Build options dynamically

@@ -20,23 +20,6 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type tempFile struct {
-	path string
-}
-
-var _ file.Temp = (*tempFile)(nil)
-
-func (t *tempFile) Path() string { return t.path }
-
-func (t *tempFile) Close() error {
-	if t.path == "" {
-		return nil
-	}
-	err := os.Remove(t.path)
-	t.path = ""
-	return err
-}
-
 type explorer struct {
 	client   *s3.Client
 	bucket   string
@@ -406,7 +389,7 @@ func (e *explorer) Download(ctx context.Context, p string) (file.Temp, error) {
 		return nil, err
 	}
 
-	return &tempFile{path: f.Name()}, nil
+	return file.AsRealTemp(f.Name()), nil
 }
 
 func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string) error {

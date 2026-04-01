@@ -12,15 +12,6 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
-type tempFile struct {
-	path string
-}
-
-var _ file.Temp = tempFile{}
-
-func (h tempFile) Path() string { return h.path }
-func (h tempFile) Close() error { return nil } // no-op
-
 type explorer struct {
 	cwd string
 }
@@ -234,7 +225,7 @@ func (l *explorer) Download(ctx context.Context, path string) (file.Temp, error)
 		return nil, errors.New("invalid path")
 	}
 
-	return tempFile{path: path}, nil
+	return file.AsFakeTemp(path), nil
 }
 
 func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) error {
