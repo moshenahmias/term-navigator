@@ -699,7 +699,7 @@ func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
 		return a, check(err)
 	}
 
-	cmd := exec.Command("open", handle.Path())
+	cmd := exec.Command("open", "-W", handle.Path())
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		defer handle.Close()
