@@ -6,7 +6,12 @@ import (
 	"path/filepath"
 )
 
-const defaultConfigName = ".termnav"
+var (
+	DefaultConfigName = ".termnav"
+	LocalType         = "local"
+	DefaultType       = LocalType
+	Types             = []string{LocalType, "s3"}
+)
 
 type Config struct {
 	Devices []DeviceConfig `json:"devices"`
@@ -30,15 +35,15 @@ type DeviceConfig struct {
 	Endpoint string `json:"endpoint,omitempty"`
 }
 
+var DefaultDevice = DeviceConfig{
+	Name: DefaultType,
+	Type: DefaultType,
+}
+
 var Default = Config{
-	Devices: []DeviceConfig{
-		{
-			Name: "default",
-			Type: "local",
-		},
-	},
-	Left:  "default",
-	Right: "default",
+	Devices: []DeviceConfig{DefaultDevice},
+	Left:    DefaultDevice.Name,
+	Right:   DefaultDevice.Name,
 }
 
 func Path() (string, error) {
@@ -47,26 +52,46 @@ func Path() (string, error) {
 		return "", err
 	}
 
-	path := filepath.Join(home, defaultConfigName)
+	path := filepath.Join(home, DefaultConfigName)
 	return path, nil
 }
 
-func Load() (*Config, error) {
+func Load() *Config {
 	path, err := Path()
 
 	if err != nil {
-		return nil, err
+		return &Default
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return &Default
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+		return &Default
 	}
 
-	return &cfg, nil
+	var found bool
+
+	for _, d := range cfg.Devices {
+		if found = d.Type == DefaultType; found {
+			break
+		}
+	}
+
+	if !found {
+		cfg.Devices = append(cfg.Devices, DefaultDevice)
+	}
+
+	if cfg.Left == "" {
+		cfg.Left = cfg.Devices[0].Name
+	}
+
+	if cfg.Right == "" {
+		cfg.Right = cfg.Devices[0].Name
+	}
+
+	return &cfg
 }

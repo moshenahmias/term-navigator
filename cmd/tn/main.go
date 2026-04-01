@@ -25,15 +25,7 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	cfg, err := config.Load()
-
-	if err != nil || len(cfg.Devices) == 0 {
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			panic(err)
-		}
-
-		cfg = &config.Default
-	}
+	cfg := config.Load()
 
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 

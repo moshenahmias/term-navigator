@@ -469,6 +469,7 @@ func (a *App) commandBar() string {
 		Render(footer)
 
 }
+
 func (a *App) applyRename(text string) tea.Cmd {
 	pane := a.activePane()
 
