@@ -32,7 +32,7 @@ Tab                Switch active pane
 F1   Help
 F2   Rename selected item
 F3   View file (read-only, uses "less")
-F4   Edit file (uses "vim")
+F4   Edit file (uses "vi" / "nano" / "pico")
 F5   Copy item to the opposite pane
 F6   Move item to the opposite pane
 F7   Create directory

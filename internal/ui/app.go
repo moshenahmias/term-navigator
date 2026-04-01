@@ -61,6 +61,8 @@ const (
 
 var _, jqErr = exec.LookPath("jq")
 
+var editors = []string{"vi", "nano", "pico"}
+
 var inputText = map[inputMode]string{
 	inputRename:        "Rename:",
 	inputMkdir:         "New directory name:",
@@ -463,14 +465,15 @@ func (a *App) commandBar() string {
 		key.Render("ESC"),
 	)
 
-	return lipgloss.NewStyle().
-		Width(a.width).         // total terminal width
-		Align(lipgloss.Center). // center horizontally
+	footerStyled := lipgloss.NewStyle().
 		Background(lipgloss.Color("#222")).
 		Foreground(lipgloss.Color("#ccc")).
-		Padding(0, 1).
 		Render(footer)
 
+	return lipgloss.NewStyle().
+		Width(a.width).
+		Align(lipgloss.Center).
+		Render(footerStyled)
 }
 
 func (a *App) applyRename(text string) tea.Cmd {
@@ -976,15 +979,19 @@ func (a *App) refreshPanesForExplorer(active file.Explorer) {
 }
 
 func execDefaultEditor(path string, jq bool) *exec.Cmd {
-	var cmd *exec.Cmd
+	for _, ed := range editors {
+		if _, err := exec.LookPath(ed); err == nil {
+			// Editor exists
+			if jq && jqErr == nil && ed == "vi" {
+				// Only vi supports the jq filter command
+				return exec.Command("vi", path, "-c", "silent %!jq .")
+			}
 
-	if jq && jqErr == nil {
-		// jq exists → pretty-print JSON inside vi
-		cmd = exec.Command("vi", path, "-c", "silent %!jq .")
-	} else {
-		// jq missing → just open the file normally
-		cmd = exec.Command("vi", path)
+			// Normal open
+			return exec.Command(ed, path)
+		}
 	}
 
-	return cmd
+	// No editor found → return a no-op command
+	return exec.Command("true")
 }
