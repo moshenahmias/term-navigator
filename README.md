@@ -1,3 +1,4 @@
+```
 ████████╗███████╗██████╗ ███╗   ███╗                                     
 ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║                                     
    ██║   █████╗  ██████╔╝██╔████╔██║                                     
@@ -11,87 +12,57 @@
 ██║╚██╗██║██╔══██║╚██╗ ██╔╝██║██║   ██║██╔══██║   ██║   ██║   ██║██╔══██╗
 ██║ ╚████║██║  ██║ ╚████╔╝ ██║╚██████╔╝██║  ██║   ██║   ╚██████╔╝██║  ██║
 ╚═╝  ╚═══╝╚═╝  ╚═╝  ╚═══╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
+```
 
-A dual-pane terminal file navigator for local filesystems and
-S3-compatible storage. Navigate, view, edit, copy, move, delete, and
-inspect files across devices.
+Term Navigator is a dual-pane terminal file manager for local filesystems and
+S3-compatible storage. It provides fast navigation, viewing, editing, copying,
+moving, deleting, and metadata inspection across multiple devices.
 
-======================================================================
-1. NAVIGATION
-======================================================================
+---
 
-Arrow Up/Down      Move selection
-Enter              Open directory or file
-Backspace          Go to parent directory
-Tab                Switch active pane
+## Features
 
-======================================================================
-2. FUNCTION KEYS
-======================================================================
+- Dual-pane interface (left and right)
+- Local filesystem backend
+- S3 backend (AWS or any S3-compatible service)
+- Copy and move files across devices
 
-F1   Help
-F2   Rename selected item
-F3   View file (read-only, uses "less")
-F4   Edit file (uses "vim")
-F5   Copy item to the opposite pane
-F6   Move item to the opposite pane
-F7   Create directory
-F8   Delete selected item
-F9   Show metadata
-F10  Change device for active pane
-F12  Swap left and right devices
-ESC  Cancel input mode
+---
 
-======================================================================
-3. DEVICES
-======================================================================
+## Installation
 
-Supported device types:
-  local   - Local filesystem
-  s3      - AWS S3 or S3-compatible (MinIO, Localstack, etc.)
+Clone the repository:
 
-Switching devices:
-  F10     Change active pane's device
-  F12     Swap left and right devices
+```
+git clone https://github.com/moshenahmias/term-navigator.git
+cd term-navigator
+```
 
-======================================================================
-4. COMMAND MODE (press ":")
-======================================================================
+Build:
 
-Commands:
+```
+go build ./cmd/termnav
+```
 
-help
-rename <old> <new>
-view <file>
-edit <file>
-copy <src> <dest>
-move <src> <dest>
-mkdir <name>
-delete <name>
-info <file>
-device <name>
-swap
-exit
-config
-exec <command>
-refresh
-cd <folder>
-shell
+Run:
 
-Aliases:
-  cp   -> copy
-  mv   -> move
-  del  -> delete
-  dev  -> device
-  cfg  -> config
-  quit -> exit
+```
+./termnav
+```
 
-======================================================================
-5. CONFIG FILE (~/.termnav)
-======================================================================
+---
 
-Example:
+## Configuration
 
+Term Navigator loads configuration from:
+
+```
+~/.termnav
+```
+
+Example configuration:
+
+```json
 {
   "devices": [
     { "name": "local", "type": "local", "path": "/home/user" },
@@ -109,9 +80,70 @@ Example:
   "left": "local",
   "right": "minio"
 }
+```
 
-======================================================================
+Supported device types:
 
-Happy navigating.
+- `local`
+- `s3`
 
-Press 'q' to exit this help viewer.
+---
+
+## Keybindings
+
+```
+F1     Help
+F2     Rename
+F3     View (less)
+F4     Edit (vim)
+F5     Copy to opposite pane
+F6     Move to opposite pane
+F7     Create directory
+F8     Delete
+F9     Metadata
+F10    Change device
+F12    Swap panes
+Tab    Switch active pane
+Enter  Open directory or file
+Backspace  Go to parent directory
+ESC    Cancel input mode
+```
+
+---
+
+## Command Mode
+
+Press `:` to enter command mode. Autocomplete is available.
+
+Commands:
+
+```
+help
+rename <old> <new>
+view <file>
+edit <file>
+copy <src> <dest>
+move <src> <dest>
+mkdir <name>
+delete <name>
+info <file>
+device <name>
+swap
+exit
+config
+exec <command>
+refresh
+cd <folder>
+shell
+```
+
+Aliases:
+
+```
+cp   -> copy
+mv   -> move
+del  -> delete
+dev  -> device
+cfg  -> config
+quit -> exit
+```

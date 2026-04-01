@@ -1,13 +1,13 @@
 .PHONY: build clean test
 
 build:
-	go build -o bin/tn ./cmd/tn
+	go build -o bin/termnav ./cmd/termnav
 
 clean:
 	rm -rf bin/
 
 test:
-	go test ./cmd/tn
+	go test ./cmd/termnav
 
 run:
-	./bin/tn
+	./bin/termnav
