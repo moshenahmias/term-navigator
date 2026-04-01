@@ -140,12 +140,11 @@ var (
 			}
 
 			path, err := config.Path()
-
 			if err != nil {
 				return check(err)
 			}
 
-			cmd := exec.Command("vim", path, "-c", "silent %!jq .")
+			cmd := execDefaultEditor(path, true)
 
 			return tea.ExecProcess(cmd, execCheck())
 		},

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os/exec"
 	"path"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -58,6 +59,8 @@ const (
 	moveConfirmationText   = "MOVE"
 )
 
+var _, jqErr = exec.LookPath("jq")
+
 var inputText = map[inputMode]string{
 	inputRename:        "Rename:",
 	inputMkdir:         "New directory name:",
@@ -88,13 +91,13 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 	var leftExp, rightExp file.Explorer
 
 	if exp, exists := devs[left]; exists {
-		leftExp = exp
+		leftExp = exp.Copy()
 	} else {
 		return nil, errors.New("left device not found: " + left)
 	}
 
 	if exp, exists := devs[right]; exists {
-		rightExp = exp
+		rightExp = exp.Copy()
 	} else {
 		return nil, errors.New("right device not found: " + right)
 	}
@@ -703,6 +706,10 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 }
 
 func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
+	if runtime.GOOS != "darwin" {
+		return a, nil
+	}
+
 	handle, err := pane.explorer.Download(a.ctx, path)
 	if err != nil {
 		return a, check(err)
@@ -833,7 +840,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		return a, check(err)
 	}
 
-	cmd := exec.Command("vim", handle.Path())
+	cmd := execDefaultEditor(handle.Path(), false)
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
 		var errs []string
@@ -966,4 +973,18 @@ func (a *App) refreshPanesForExplorer(active file.Explorer) {
 	if right == active || sameDirSameDevice(right, active, a.ctx) {
 		a.right.refresh()
 	}
+}
+
+func execDefaultEditor(path string, jq bool) *exec.Cmd {
+	var cmd *exec.Cmd
+
+	if jq && jqErr == nil {
+		// jq exists → pretty-print JSON inside vi
+		cmd = exec.Command("vi", path, "-c", "silent %!jq .")
+	} else {
+		// jq missing → just open the file normally
+		cmd = exec.Command("vi", path)
+	}
+
+	return cmd
 }
