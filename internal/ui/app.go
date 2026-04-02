@@ -306,6 +306,7 @@ func (a *App) renderStatus() string {
 	if a.msg.isErr {
 		return errorStyle.Render(a.msg.text)
 	}
+
 	return successStyle.Render(a.msg.text)
 }
 
@@ -767,7 +768,7 @@ func (a *App) runMove() (tea.Model, tea.Cmd) {
 
 func (a *App) runMakeDir() (tea.Model, tea.Cmd) {
 	a.inputMode = inputMkdir
-	a.textbox.SetValue("New Folder")
+	a.textbox.SetValue("")
 	a.textbox.Placeholder = "Directory name"
 	a.textbox.SetSuggestions(nil)
 	a.textbox.Focus()

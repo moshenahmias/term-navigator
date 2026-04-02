@@ -18,13 +18,19 @@ func failure(text string) tea.Cmd {
 
 func execCheck() tea.ExecCallback {
 	return func(err error) tea.Msg {
-		return check(err)
+		if err == nil {
+			return nil
+		}
+		return newErrorMsg(err.Error())
 	}
 }
 
 func execResolve(text string) tea.ExecCallback {
 	return func(err error) tea.Msg {
-		return resolve(err, text)
+		if err == nil {
+			return newStatusMsg(text)
+		}
+		return newErrorMsg(err.Error())
 	}
 }
 

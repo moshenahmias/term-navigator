@@ -146,7 +146,7 @@ var (
 
 			cmd := execDefaultEditor(path, true)
 
-			return tea.ExecProcess(cmd, execCheck())
+			return tea.ExecProcess(cmd, execResolve("Restart required for changes to take effect"))
 		},
 		"exec": func(a *App, args []string) tea.Cmd {
 			if len(args) == 0 {
