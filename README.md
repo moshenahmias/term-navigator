@@ -26,6 +26,7 @@ moving, deleting, and metadata inspection across multiple devices.
 - Local filesystem backend
 - S3 backend (AWS or any S3-compatible service)
 - Copy and move files across devices
+- In-memory virtual filesystem
 
 ---
 

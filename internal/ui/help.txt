@@ -12,9 +12,10 @@
 ██║ ╚████║██║  ██║ ╚████╔╝ ██║╚██████╔╝██║  ██║   ██║   ╚██████╔╝██║  ██║
 ╚═╝  ╚═══╝╚═╝  ╚═╝  ╚═══╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-A dual-pane terminal file navigator for local filesystems and
-S3-compatible storage. Navigate, view, edit, copy, move, delete, and
-inspect files across devices.
+A dual-pane terminal file navigator for local filesystems,
+S3-compatible storage, and in-memory virtual filesystems.
+Navigate, view, edit, copy, move, delete, and inspect files
+across devices.
 
 ======================================================================
 1. NAVIGATION
@@ -49,6 +50,7 @@ ESC  Cancel input mode
 Supported device types:
   local   - Local filesystem
   s3      - AWS S3 or S3-compatible (MinIO, Localstack, etc.)
+  fakefs  - In-memory virtual filesystem (for testing, demos, sandboxing)
 
 Switching devices:
   F10     Change active pane's device
@@ -104,10 +106,14 @@ Example:
       "key": "minioadmin",
       "secret": "minioadmin",
       "prefix": "projects/"
+    },
+    {
+      "name": "demo",
+      "type": "fakefs"
     }
   ],
   "left": "local",
-  "right": "minio"
+  "right": "demo"
 }
 
 ======================================================================
