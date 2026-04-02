@@ -443,33 +443,39 @@ func (e *Explorer) Download(ctx context.Context, p string) (file.Temp, error) {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) UploadFrom(ctx context.Context, localPath, destPath string) error {
+func (e *Explorer) UploadFrom(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
 	info, err := os.Lstat(localPath)
 	if err != nil {
 		return err
 	}
 
 	if info.IsDir() {
-		return e.uploadDir(ctx, localPath, destPath)
+		return e.uploadDir(ctx, localPath, destPath, progress)
 	}
 
-	return e.uploadFile(ctx, localPath, destPath)
+	return e.uploadFile(ctx, localPath, destPath, func(n int64) {
+		progress(n, info.Size())
+	})
 }
 
-func (e *Explorer) uploadFile(ctx context.Context, localPath, destPath string) error {
+func (e *Explorer) uploadFile(ctx context.Context, localPath, destPath string, progress file.TotalReadFunc) error {
 	f, err := os.Open(localPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	return e.Write(ctx, destPath, f)
+	return e.Write(ctx, destPath, file.AsProgressReader(ctx, f, progress))
 }
 
-func (e *Explorer) uploadDir(ctx context.Context, localPath, destPath string) error {
+func (e *Explorer) uploadDir(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
 	return filepathWalk(localPath, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 
 		rel := strings.TrimPrefix(p, localPath)
@@ -480,7 +486,9 @@ func (e *Explorer) uploadDir(ctx context.Context, localPath, destPath string) er
 			return e.Mkdir(ctx, target)
 		}
 
-		return e.uploadFile(ctx, p, target)
+		return e.uploadFile(ctx, p, target, func(n int64) {
+			progress(n, fi.Size())
+		})
 	})
 }
 

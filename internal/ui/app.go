@@ -26,8 +26,6 @@ import (
 //go:embed help.txt
 var helpText string
 
-const statusMsgDuration = time.Second * 5
-
 var (
 	ncBorder = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()) // simple border
@@ -36,9 +34,18 @@ var (
 type statusMsg struct {
 	text  string
 	isErr bool
+	d     time.Duration
 }
 
 type clearStatusMsg struct{}
+
+type asyncJobDoneMsg struct {
+	msg tea.Msg
+}
+
+type progressMsg struct {
+	text string
+}
 
 type inputMode int
 
@@ -76,17 +83,21 @@ var inputText = map[inputMode]string{
 var _ tea.Model = (*App)(nil)
 
 type App struct {
-	width     int
-	height    int
-	left      *Pane
-	right     *Pane
-	focus     int // 0 = left, 1 = right
-	textbox   textinput.Model
-	inputMode inputMode
-	msg       statusMsg
-	ctx       context.Context
-	devs      map[string]file.Explorer
-	devsHint  string
+	width            int
+	height           int
+	left             *Pane
+	right            *Pane
+	focus            int // 0 = left, 1 = right
+	textbox          textinput.Model
+	inputMode        inputMode
+	msg              statusMsg
+	ctx              context.Context
+	devs             map[string]file.Explorer
+	devsHint         string
+	asyncJobRunning  bool
+	asyncJobCancel   context.CancelFunc
+	Send             func(tea.Msg)
+	lastProgressSent time.Time
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -130,6 +141,29 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 
 func (a *App) Init() tea.Cmd { return nil }
 
+func (a *App) runAsyncJob(progressText func(n, total int64) string, job func(context.Context, file.ProgressFunc) tea.Msg) {
+	a.lastProgressSent = time.Now()
+
+	progress := func(n, total int64) {
+		if time.Since(a.lastProgressSent) < 100*time.Millisecond {
+			return
+		}
+		a.lastProgressSent = time.Now()
+
+		a.Send(progressMsg{
+			progressText(n, total),
+		})
+	}
+
+	a.asyncJobRunning = true
+	var ctx context.Context
+	ctx, a.asyncJobCancel = context.WithCancel(a.ctx)
+
+	go func() {
+		a.Send(asyncJobDoneMsg{job(ctx, progress)})
+	}()
+}
+
 func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -154,9 +188,22 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case inputConfirmDelete:
 				return a, a.applyDelete(a.textbox.Value())
 			case inputConfirmCopy:
-				return a, a.applyCopy(a.textbox.Value())
+				a.runAsyncJob(func(n, total int64) string {
+					return fmt.Sprintf("Copied %d/%d bytes", n, total)
+				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
+					return a.applyCopy(ctx, a.textbox.Value(), progress)()
+				})
+
+				return a, nil
+
 			case inputConfirmMove:
-				return a, a.applyMove(a.textbox.Value())
+				a.runAsyncJob(func(n, total int64) string {
+					return fmt.Sprintf("Moved %d/%d bytes", n, total)
+				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
+					return a.applyMove(ctx, a.textbox.Value(), progress)()
+				})
+
+				return a, nil
 			case inputChangeDevice:
 				return a, a.applyChangeDevice(a.textbox.Value())
 			case inputCommand:
@@ -178,9 +225,18 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case progressMsg:
+		a.msg = statusMsg{text: fmt.Sprintf("%s [ESC]", msg.text), isErr: false}
+		return a, nil
+
 	case statusMsg:
 		a.msg = msg
-		return a, tea.Tick(statusMsgDuration, func(time.Time) tea.Msg {
+
+		if msg.d <= 0 || msg.text == "" {
+			return a, nil
+		}
+
+		return a, tea.Tick(msg.d, func(time.Time) tea.Msg {
 			return clearStatusMsg{}
 		})
 	case clearStatusMsg:
@@ -203,7 +259,21 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.Resize(paneWidth, paneHeight)
 		a.right.Resize(paneWidth, paneHeight)
 
+	case asyncJobDoneMsg:
+		a.asyncJobCancel()
+		a.asyncJobRunning = false
+		return a, func() tea.Msg {
+			return msg.msg
+		}
+
 	case tea.KeyMsg:
+		if a.asyncJobRunning {
+			if msg.String() == "esc" {
+				a.asyncJobCancel()
+			}
+			return a, nil
+		}
+
 		switch msg.String() {
 
 		case "tab":
@@ -283,7 +353,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if a.inputMode != inputNone {
+	if a.inputMode != inputNone && !a.asyncJobRunning {
 		return a.updateInput(msg)
 	}
 
@@ -307,7 +377,9 @@ func (a *App) renderStatus() string {
 		return errorStyle.Render(a.msg.text)
 	}
 
-	return successStyle.Render(a.msg.text)
+	return a.msg.text
+
+	//return successStyle.Render(a.msg.text)
 }
 
 func (a *App) View() tea.View {
@@ -517,7 +589,7 @@ func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 	return status(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
 }
 
-func (a *App) applyCopy(text string) tea.Cmd {
+func (a *App) applyCopy(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
 	src := a.activePane()
 
 	// pick destination pane
@@ -535,28 +607,28 @@ func (a *App) applyCopy(text string) tea.Cmd {
 		return failure("confirmation text does not match")
 	}
 
-	return a.applyCopyInner(src, dst, item.Info.FullPath, item.Info.Name)
+	return a.applyCopyInner(ctx, src, dst, item.Info.FullPath, item.Info.Name, progress)
 }
 
-func (a *App) applyCopyInner(src, dst *Pane, from, name string) tea.Cmd {
-	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
+func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
+	if src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
 		return failure("Source and destination are the same")
 	}
 
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(a.ctx, from)
+		handle, err := src.explorer.Download(ctx, from)
 		if err != nil {
-			return check(err)
+			return newErrorMsg(err.Error())
 		}
 
 		// We will collect ALL errors here
 		var errs []string
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(a.ctx), name)
+		dstPath := path.Join(dst.explorer.Cwd(ctx), name)
 
-		if err := dst.explorer.UploadFrom(a.ctx, handle.Path(), dstPath); err != nil {
+		if err := dst.explorer.UploadFrom(ctx, handle.Path(), dstPath, progress); err != nil {
 			errs = append(errs, "Copy failed: "+err.Error())
 		}
 
@@ -570,13 +642,12 @@ func (a *App) applyCopyInner(src, dst *Pane, from, name string) tea.Cmd {
 
 		// 5. If any errors occurred, show them
 		if len(errs) > 0 {
-			return failure(strings.Join(errs, " | "))
+			return newErrorMsg(strings.Join(errs, " | "))
 		}
-
-		return status(fmt.Sprintf("Copied %q to %q", from, dstPath))
+		return newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
 	}
 }
-func (a *App) applyMove(text string) tea.Cmd {
+func (a *App) applyMove(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
 	src := a.activePane()
 
 	// pick destination pane
@@ -594,27 +665,27 @@ func (a *App) applyMove(text string) tea.Cmd {
 		return failure("confirmation text does not match")
 	}
 
-	return a.applyMoveInner(src, dst, item.Info.FullPath, item.Info.Name)
+	return a.applyMoveInner(ctx, src, dst, item.Info.FullPath, item.Info.Name, progress)
 }
 
-func (a *App) applyMoveInner(src, dst *Pane, from, name string) tea.Cmd {
-	if src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
+func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
+	if src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
 		return failure("Source and destination are the same")
 	}
 
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(a.ctx, from)
+		handle, err := src.explorer.Download(ctx, from)
 		if err != nil {
-			return check(err)
+			return newErrorMsg(err.Error())
 		}
 
 		// We will collect ALL errors here
 		var errs []string
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(a.ctx), name)
-		if err := dst.explorer.UploadFrom(a.ctx, handle.Path(), dstPath); err != nil {
+		dstPath := path.Join(dst.explorer.Cwd(ctx), name)
+		if err := dst.explorer.UploadFrom(ctx, handle.Path(), dstPath, progress); err != nil {
 			errs = append(errs, "Move failed: "+err.Error())
 		}
 
@@ -625,7 +696,7 @@ func (a *App) applyMoveInner(src, dst *Pane, from, name string) tea.Cmd {
 
 		// 4. Attempt to delete source (only if download/upload succeeded)
 		if len(errs) == 0 {
-			if err := src.explorer.Delete(a.ctx, from); err != nil {
+			if err := src.explorer.Delete(ctx, from); err != nil {
 				errs = append(errs, "Delete failed: "+err.Error())
 			}
 		}
@@ -636,10 +707,10 @@ func (a *App) applyMoveInner(src, dst *Pane, from, name string) tea.Cmd {
 
 		// 6. If any errors occurred, show them
 		if len(errs) > 0 {
-			return failure(strings.Join(errs, " | "))
+			return newErrorMsg(strings.Join(errs, " | "))
 		}
 
-		return status(fmt.Sprintf("Moved %q to %q", from, dstPath))
+		return newStatusMsg(fmt.Sprintf("Moved %q to %q", from, dstPath))
 	}
 }
 
@@ -723,7 +794,12 @@ func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		defer handle.Close()
-		return check(err)
+
+		if err != nil {
+			return newErrorMsg(err.Error())
+		}
+
+		return nil
 	})
 }
 
@@ -821,7 +897,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 3. return combined error or nil
 		if len(errs) > 0 {
-			return failure(strings.Join(errs, " | "))
+			return newErrorMsg(strings.Join(errs, " | "))
 		}
 
 		return nil
@@ -854,7 +930,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 			errs = append(errs, "Editor failed: "+procErr.Error())
 		} else {
 			// 2. Upload error (only if editor succeeded)
-			if err := pane.explorer.UploadFrom(a.ctx, handle.Path(), filename); err != nil {
+			if err := pane.explorer.UploadFrom(a.ctx, handle.Path(), filename, nil); err != nil {
 				errs = append(errs, "Upload failed: "+err.Error())
 			}
 		}
@@ -866,7 +942,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 4. Return combined error or nil
 		if len(errs) > 0 {
-			return failure(strings.Join(errs, " | "))
+			return newErrorMsg(strings.Join(errs, " | "))
 		}
 
 		pane.lastSelectedPath = filename
@@ -884,7 +960,7 @@ func (a *App) runHelp() (tea.Model, tea.Cmd) {
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
-			return check(err)
+			return newErrorMsg(err.Error())
 		}
 		return nil
 	})

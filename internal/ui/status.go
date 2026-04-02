@@ -1,13 +1,19 @@
 package ui
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+)
+
+const defaultStatusDuration = time.Second * 5
 
 func newErrorMsg(text string) tea.Msg {
-	return statusMsg{text: text, isErr: true}
+	return statusMsg{text: text, isErr: true, d: defaultStatusDuration}
 }
 
 func newStatusMsg(text string) tea.Msg {
-	return statusMsg{text: text, isErr: false}
+	return statusMsg{text: text, isErr: false, d: defaultStatusDuration}
 }
 
 func failure(text string) tea.Cmd {

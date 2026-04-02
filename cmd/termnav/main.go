@@ -65,7 +65,9 @@ func run(ctx context.Context) error {
 	}
 
 	p := tea.NewProgram(app)
-
+	app.Send = func(m tea.Msg) {
+		p.Send(m)
+	}
 	if _, err := p.Run(); err != nil {
 		return errors.New("failed to run program: " + err.Error())
 	}

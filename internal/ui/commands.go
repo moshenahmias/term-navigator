@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"maps"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/moshenahmias/term-navigator/internal/config"
+	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
 var (
@@ -63,7 +65,13 @@ var (
 
 			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
 
-			return a.applyCopyInner(src, dst, from, args[1])
+			a.runAsyncJob(func(n, total int64) string {
+				return fmt.Sprintf("Copied %d/%d bytes", n, total)
+			}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
+				return a.applyCopyInner(a.ctx, src, dst, from, args[1], progress)()
+			})
+
+			return nil
 		},
 		"move": func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
@@ -79,7 +87,13 @@ var (
 
 			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
 
-			return a.applyMoveInner(src, dst, from, args[1])
+			a.runAsyncJob(func(n, total int64) string {
+				return fmt.Sprintf("Moved %d/%d bytes", n, total)
+			}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
+				return a.applyMoveInner(ctx, src, dst, from, args[1], progress)()
+			})
+
+			return nil
 		},
 		"mkdir": func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {

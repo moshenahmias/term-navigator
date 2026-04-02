@@ -228,7 +228,7 @@ func (l *explorer) Download(ctx context.Context, path string) (file.Temp, error)
 	return file.AsFakeTemp(path), nil
 }
 
-func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) error {
+func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
 	if localPath == "" || destPath == "" {
 		return errors.New("invalid path")
 	}
@@ -275,6 +275,10 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 				return err
 			}
 
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
 			// Compute relative path inside the directory
 			rel, err := filepath.Rel(localPath, p)
 			if err != nil {
@@ -300,7 +304,9 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 				return err
 			}
 
-			return l.Write(ctx, target, src)
+			return l.Write(ctx, target, file.AsProgressReader(ctx, src, func(n int64) {
+				progress(n, fi.Size())
+			}))
 		})
 	}
 
@@ -318,7 +324,9 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 	}
 	defer src.Close()
 
-	return l.Write(ctx, destPath, src)
+	return l.Write(ctx, destPath, file.AsProgressReader(ctx, src, func(n int64) {
+		progress(n, info.Size())
+	}))
 }
 
 func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {

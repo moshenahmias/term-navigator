@@ -392,7 +392,7 @@ func (e *explorer) Download(ctx context.Context, p string) (file.Temp, error) {
 	return file.AsRealTemp(f.Name()), nil
 }
 
-func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string) error {
+func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
 	if localPath == "" || destPath == "" {
 		return errors.New("invalid path")
 	}
@@ -407,6 +407,10 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 		return filepath.Walk(localPath, func(p string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return err
+			}
+
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
 
 			rel, err := filepath.Rel(localPath, p)
@@ -437,7 +441,9 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 			_, err = e.client.PutObject(ctx, &s3.PutObjectInput{
 				Bucket: aws.String(e.bucket),
 				Key:    aws.String(targetKey),
-				Body:   src,
+				Body: file.AsProgressReader(ctx, src, func(n int64) {
+					progress(n, fi.Size())
+				}),
 			})
 			return err
 		})
@@ -454,7 +460,9 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string) e
 	_, err = e.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(e.bucket),
 		Key:    aws.String(key),
-		Body:   src,
+		Body: file.AsProgressReader(ctx, src, func(n int64) {
+			progress(n, info.Size())
+		}),
 	})
 	return err
 }

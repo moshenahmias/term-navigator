@@ -22,6 +22,8 @@ type Temp interface {
 	Close() error
 }
 
+type ProgressFunc func(n, total int64)
+
 type Explorer interface {
 	Copy() Explorer
 	DeviceID(ctx context.Context) string
@@ -41,6 +43,6 @@ type Explorer interface {
 	Mkdir(ctx context.Context, path string) error
 	Rename(ctx context.Context, oldPath, newPath string) error
 	Download(ctx context.Context, path string) (Temp, error)
-	UploadFrom(ctx context.Context, localPath, destPath string) error
+	UploadFrom(ctx context.Context, localPath, destPath string, progress ProgressFunc) error
 	Metadata(ctx context.Context, path string) (map[string]string, error)
 }
