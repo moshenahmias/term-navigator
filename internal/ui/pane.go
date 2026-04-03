@@ -111,16 +111,22 @@ type FileItem struct {
 	Info file.Info
 }
 
+const parentDirName = ".."
+
+func (f *FileItem) isParentDir() bool {
+	return f.Info.IsDir && f.Info.Name == parentDirName
+}
+
 func (f *FileItem) isDeleteable() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return !f.isParentDir()
 }
 
 func (f *FileItem) isRenamable() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return !f.isParentDir()
 }
 
 func (f *FileItem) isCopyable() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return !f.isParentDir()
 }
 
 func (f *FileItem) isMoveable() bool {
@@ -140,7 +146,7 @@ func (f *FileItem) isEditable() bool {
 }
 
 func (f *FileItem) hasMetadata() bool {
-	return !f.Info.IsDir || f.Info.Name != ".."
+	return !f.isParentDir()
 }
 
 func (f *FileItem) isArchive() bool {
@@ -163,7 +169,7 @@ func (f *FileItem) isArchive() bool {
 func (f *FileItem) TitleNoIcons() string {
 	name := f.Info.Name
 
-	if f.Info.IsDir && name != ".." {
+	if f.Info.IsDir && name != parentDirName {
 		return name + "/"
 	}
 
@@ -192,7 +198,7 @@ func (f *FileItem) Title() string {
 		Render(icon)
 
 	// Add slash for directories
-	if f.Info.IsDir && name != ".." {
+	if f.Info.IsDir && name != parentDirName {
 		name += "/"
 	}
 
@@ -297,8 +303,8 @@ func (p *Pane) refresh() {
 	if !p.explorer.IsRoot(p.ctx) {
 		upItem := &FileItem{
 			Info: file.Info{
-				Name:     "..",
-				FullPath: "..",
+				Name:     parentDirName,
+				FullPath: parentDirName,
 				IsDir:    true,
 			},
 		}
@@ -306,7 +312,7 @@ func (p *Pane) refresh() {
 		li = append(li, upItem)
 
 		// If renamed item is ".." (unlikely), match here
-		if p.lastSelectedPath == ".." {
+		if p.lastSelectedPath == parentDirName {
 			selectedIndex = 0
 		}
 	}

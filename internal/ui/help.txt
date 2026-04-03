@@ -66,27 +66,19 @@ help
 rename <old> <new>
 view <file>
 edit <file>
-copy <src> <dest>
-move <src> <dest>
+copy(cp) <src> <dest>
+move/mv <src> <dest>
 mkdir <name>
-delete <name>
+delete(del) <name>
 info <file>
-device <name>
+device(dev) <name>
 swap
-exit
-config
+exit(quit, bye)
+config(cfg)
 exec <command>
 refresh
 cd <folder>
 shell
-
-Aliases:
-  cp   -> copy
-  mv   -> move
-  del  -> delete
-  dev  -> device
-  cfg  -> config
-  quit -> exit
 
 ======================================================================
 5. CONFIG FILE (~/.termnav)

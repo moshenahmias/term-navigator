@@ -217,11 +217,20 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			a.inputMode = inputNone
 			return a, nil
+		default:
+			a.setLiveSuggestions(a.textbox.Value())
+			return a, nil
 		}
 	}
 
-	// 🔥 IMPORTANT: return here so pane does NOT update
 	return a, cmd
+}
+
+func (a *App) setLiveSuggestions(text string) {
+	switch a.inputMode {
+	case inputCommand:
+		a.setCommandSuggestions(text)
+	}
 }
 
 func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -291,7 +300,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err == nil {
 				dst := info.FullPath
 				if info.IsDir || info.IsSymlinkToDir {
-					if info.Name == ".." {
+					if info.Name == parentDirName {
 						// Handle parent directory navigation
 						if parent, exists := active.explorer.Parent(a.ctx); exists {
 							dst = parent

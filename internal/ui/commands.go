@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"maps"
 	"os"
 	"os/exec"
-	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -15,9 +13,24 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
+var (
+	allButParentDirItemSuggestionsFilter = func(fi *FileItem) bool {
+		return !fi.isParentDir()
+	}
+
+	dirsOnlyItemSuggestionsFilter = func(fi *FileItem) bool {
+		return fi.Info.IsDir
+	}
+
+	filesOnlyItemSuggestionsFilter = func(fi *FileItem) bool {
+		return !fi.Info.IsDir
+	}
+)
+
 type command struct {
-	f       func(a *App, args []string) tea.Cmd
-	aliases []string
+	f           func(a *App, args []string) tea.Cmd
+	aliases     []string
+	suggestions func(*App, string) []string
 }
 
 var (
@@ -37,6 +50,8 @@ var (
 			active := a.activePane()
 
 			return a.applyRenameInner(active, args[0], args[1])
+		}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
 		"view": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
@@ -46,6 +61,8 @@ var (
 			active := a.activePane()
 			_, cmd := a.runViewInner(active, args[0])
 			return cmd
+		}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
 		}},
 		"edit": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
@@ -55,6 +72,8 @@ var (
 			active := a.activePane()
 			_, cmd := a.runEditInner(active, args[0])
 			return cmd
+		}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
 		}},
 		"copy": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
@@ -77,7 +96,9 @@ var (
 			})
 
 			return nil
-		}, aliases: []string{"cp"}},
+		}, aliases: []string{"cp"}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
+		}},
 		"move": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: move <src> <dest>")
@@ -99,7 +120,9 @@ var (
 			})
 
 			return nil
-		}, aliases: []string{"mv"}},
+		}, aliases: []string{"mv"}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
+		}},
 		"mkdir": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: mkdir <name>")
@@ -113,7 +136,9 @@ var (
 			}
 
 			return a.applyDeleteInner(a.activePane(), args[0])
-		}, aliases: []string{"del"}},
+		}, aliases: []string{"del"}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
+		}},
 		"info": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: info <filename>")
@@ -122,6 +147,8 @@ var (
 			active := a.activePane()
 			_, cmd := a.runMetadataInner(active, args[0])
 			return cmd
+		}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
 		"device": {f: func(a *App, args []string) tea.Cmd {
 			if len(a.devs) < 2 {
@@ -137,7 +164,12 @@ var (
 			}
 
 			return a.applyChangeDevice(args[0])
-		}, aliases: []string{"dev"}},
+		}, aliases: []string{"dev"}, suggestions: func(a *App, s string) (sugg []string) {
+			for d := range a.devs {
+				sugg = append(sugg, fmt.Sprintf("%s %s", s, d))
+			}
+			return
+		}},
 		"swap": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: swap")
@@ -200,7 +232,7 @@ var (
 
 			var path string
 
-			if args[0] == ".." {
+			if args[0] == parentDirName {
 				if parent, ok := active.explorer.Parent(a.ctx); ok {
 					path = parent
 				} else {
@@ -217,6 +249,8 @@ var (
 			active.refresh()
 
 			return nil
+		}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, dirsOnlyItemSuggestionsFilter)
 		}},
 		"shell": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
@@ -252,25 +286,53 @@ func init() {
 func (a *App) runCommand() (tea.Model, tea.Cmd) {
 	a.inputMode = inputCommand
 	a.textbox.SetValue("")
+	a.setCommandSuggestions("")
+	a.textbox.Placeholder = ""
+	a.textbox.Focus()
 
-	suggestions := slices.Clone(slices.Collect(maps.Keys(commands)))
+	return a, nil
+}
+
+func (a *App) generateItemSuggestions(text string, filter func(*FileItem) bool) []string {
+	var suggestions []string
 
 	if active := a.activePane(); active != nil {
-		for cmd := range commands {
-			for _, item := range active.list.Items() {
-				name := item.(*FileItem).Info.Name
-				if name != ".." {
-					suggestions = append(suggestions, fmt.Sprintf("%s %s", cmd, name))
-				}
+		for _, item := range active.list.Items() {
+			fi := item.(*FileItem)
+			if filter == nil || filter(fi) {
+				suggestions = append(suggestions, fmt.Sprintf("%s %s", text, fi.Info.Name))
 			}
 		}
 	}
 
-	a.textbox.Placeholder = ""
-	a.textbox.SetSuggestions(suggestions)
-	a.textbox.Focus()
+	return suggestions
+}
 
-	return a, nil
+func (a *App) setCommandSuggestions(text string) {
+	if text == "" {
+		var suggestions []string
+
+		for name, cmd := range commands {
+			suggestions = append(suggestions, name)
+			for _, alias := range cmd.aliases {
+				suggestions = append(suggestions, alias)
+			}
+		}
+
+		a.textbox.SetSuggestions(suggestions)
+	} else {
+		name := text
+
+		if s, exists := commandAlias[text]; exists {
+			name = s
+		}
+
+		if cmd, ok := commands[name]; ok {
+			if cmd.suggestions != nil {
+				a.textbox.SetSuggestions(cmd.suggestions(a, text))
+			}
+		}
+	}
 }
 
 func (a *App) applyCommand(text string) tea.Cmd {
