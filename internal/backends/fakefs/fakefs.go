@@ -454,7 +454,7 @@ func (e *Explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	}
 
 	return e.uploadFile(ctx, localPath, destPath, func(n int64) {
-		progress(n, info.Size())
+		progress(localPath, n, info.Size())
 	})
 }
 
@@ -487,7 +487,7 @@ func (e *Explorer) uploadDir(ctx context.Context, localPath, destPath string, pr
 		}
 
 		return e.uploadFile(ctx, p, target, func(n int64) {
-			progress(n, fi.Size())
+			progress(p, n, fi.Size())
 		})
 	})
 }

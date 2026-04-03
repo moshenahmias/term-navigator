@@ -141,17 +141,17 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 
 func (a *App) Init() tea.Cmd { return nil }
 
-func (a *App) runAsyncJob(progressText func(n, total int64) string, job func(context.Context, file.ProgressFunc) tea.Msg) {
+func (a *App) runAsyncJob(progressText func(name string, n, total int64) string, job func(context.Context, file.ProgressFunc) tea.Msg) {
 	a.lastProgressSent = time.Now()
 
-	progress := func(n, total int64) {
+	progress := func(name string, n, total int64) {
 		if time.Since(a.lastProgressSent) < 100*time.Millisecond {
 			return
 		}
 		a.lastProgressSent = time.Now()
 
 		a.Send(progressMsg{
-			progressText(n, total),
+			progressText(name, n, total),
 		})
 	}
 
@@ -188,8 +188,8 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case inputConfirmDelete:
 				return a, a.applyDelete(a.textbox.Value())
 			case inputConfirmCopy:
-				a.runAsyncJob(func(n, total int64) string {
-					return fmt.Sprintf("Copied %d/%d bytes", n, total)
+				a.runAsyncJob(func(name string, n, total int64) string {
+					return fmt.Sprintf("Copied %d/%d bytes of %s", n, total, name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyCopy(ctx, a.textbox.Value(), progress)()
 				})
@@ -197,8 +197,8 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, nil
 
 			case inputConfirmMove:
-				a.runAsyncJob(func(n, total int64) string {
-					return fmt.Sprintf("Moved %d/%d bytes", n, total)
+				a.runAsyncJob(func(name string, n, total int64) string {
+					return fmt.Sprintf("Moved %d/%d bytes of %s", n, total, name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyMove(ctx, a.textbox.Value(), progress)()
 				})

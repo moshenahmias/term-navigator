@@ -22,7 +22,7 @@ type Temp interface {
 	Close() error
 }
 
-type ProgressFunc func(n, total int64)
+type ProgressFunc func(name string, n, total int64)
 
 type Explorer interface {
 	Copy() Explorer

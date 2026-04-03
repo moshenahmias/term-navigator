@@ -305,7 +305,7 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 			}
 
 			return l.Write(ctx, target, file.AsProgressReader(ctx, src, func(n int64) {
-				progress(n, fi.Size())
+				progress(p, n, fi.Size())
 			}))
 		})
 	}
@@ -325,7 +325,7 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	defer src.Close()
 
 	return l.Write(ctx, destPath, file.AsProgressReader(ctx, src, func(n int64) {
-		progress(n, info.Size())
+		progress(localPath, n, info.Size())
 	}))
 }
 

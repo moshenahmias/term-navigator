@@ -442,7 +442,7 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 				Bucket: aws.String(e.bucket),
 				Key:    aws.String(targetKey),
 				Body: file.AsProgressReader(ctx, src, func(n int64) {
-					progress(n, fi.Size())
+					progress(p, n, fi.Size())
 				}),
 			})
 			return err
@@ -461,7 +461,7 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 		Bucket: aws.String(e.bucket),
 		Key:    aws.String(key),
 		Body: file.AsProgressReader(ctx, src, func(n int64) {
-			progress(n, info.Size())
+			progress(localPath, n, info.Size())
 		}),
 	})
 	return err
