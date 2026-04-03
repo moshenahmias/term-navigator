@@ -304,9 +304,15 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 				return err
 			}
 
-			return l.Write(ctx, target, file.AsProgressReader(ctx, src, func(n int64) {
-				progress(p, n, fi.Size())
-			}))
+			var pr io.Reader = src
+
+			if progress != nil {
+				pr = file.AsProgressReader(ctx, src, func(n int64) {
+					progress(p, n, fi.Size())
+				})
+			}
+
+			return l.Write(ctx, target, pr)
 		})
 	}
 
@@ -324,9 +330,15 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	}
 	defer src.Close()
 
-	return l.Write(ctx, destPath, file.AsProgressReader(ctx, src, func(n int64) {
-		progress(localPath, n, info.Size())
-	}))
+	var pr io.Reader = src
+
+	if progress != nil {
+		pr = file.AsProgressReader(ctx, src, func(n int64) {
+			progress(localPath, n, info.Size())
+		})
+	}
+
+	return l.Write(ctx, destPath, pr)
 }
 
 func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {

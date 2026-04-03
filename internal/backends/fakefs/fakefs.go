@@ -465,7 +465,13 @@ func (e *Explorer) uploadFile(ctx context.Context, localPath, destPath string, p
 	}
 	defer f.Close()
 
-	return e.Write(ctx, destPath, file.AsProgressReader(ctx, f, progress))
+	var pr io.Reader = f
+
+	if progress != nil {
+		pr = file.AsProgressReader(ctx, f, progress)
+	}
+
+	return e.Write(ctx, destPath, pr)
 }
 
 func (e *Explorer) uploadDir(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {

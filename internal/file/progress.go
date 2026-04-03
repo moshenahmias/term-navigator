@@ -30,6 +30,10 @@ func (r *progressReader) Read(p []byte) (int, error) {
 }
 
 func AsProgressReader(ctx context.Context, r io.Reader, callback TotalReadFunc) io.Reader {
+	if r == nil || callback == nil {
+		return r
+	}
+
 	return &progressReader{
 		r:        r,
 		callback: callback,
@@ -50,11 +54,15 @@ func (p *progressReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 	return p.seeker.Seek(offset, whence)
 }
 
-func AsProgressReadSeeker(ctx context.Context, r io.ReadSeeker, cb TotalReadFunc) io.ReadSeeker {
+func AsProgressReadSeeker(ctx context.Context, r io.ReadSeeker, callback TotalReadFunc) io.ReadSeeker {
+	if r == nil || callback == nil {
+		return r
+	}
+
 	return &progressReaderSeeker{
 		progressReader: &progressReader{
 			r:        r,
-			callback: cb,
+			callback: callback,
 			ctx:      ctx,
 		},
 		seeker: r,

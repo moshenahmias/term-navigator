@@ -438,12 +438,18 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 			}
 			defer src.Close()
 
+			var prs io.ReadSeeker = src
+
+			if progress != nil {
+				prs = file.AsProgressReadSeeker(ctx, src, func(n int64) {
+					progress(p, n, fi.Size())
+				})
+			}
+
 			_, err = e.client.PutObject(ctx, &s3.PutObjectInput{
 				Bucket: aws.String(e.bucket),
 				Key:    aws.String(targetKey),
-				Body: file.AsProgressReadSeeker(ctx, src, func(n int64) {
-					progress(p, n, fi.Size())
-				}),
+				Body:   prs,
 			})
 			return err
 		})
@@ -456,13 +462,19 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	}
 	defer src.Close()
 
+	var prs io.ReadSeeker = src
+
+	if progress != nil {
+		prs = file.AsProgressReadSeeker(ctx, src, func(n int64) {
+			progress(localPath, n, info.Size())
+		})
+	}
+
 	key := e.abs(destPath)
 	_, err = e.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(e.bucket),
 		Key:    aws.String(key),
-		Body: file.AsProgressReadSeeker(ctx, src, func(n int64) {
-			progress(localPath, n, info.Size())
-		}),
+		Body:   prs,
 	})
 	return err
 }
