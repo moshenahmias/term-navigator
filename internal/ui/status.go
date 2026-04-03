@@ -46,11 +46,11 @@ func execResolve(text string) tea.ExecCallback {
 }
 
 func check(err error) tea.Cmd {
-	if err == nil {
-		return nil
-	}
-
 	return func() tea.Msg {
+		if err == nil {
+			return nil
+		}
+
 		return newErrorMsg(err.Error())
 	}
 }

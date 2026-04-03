@@ -191,7 +191,7 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.applyDelete(a.textbox.Value())
 			case inputConfirmCopy:
 				a.runAsyncJob(func(name string, n, total int64) string {
-					return fmt.Sprintf("Copied %s/%s of %s", bytesFormatter(n), bytesFormatter(total), name)
+					return fmt.Sprintf("Copied %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyCopy(ctx, a.textbox.Value(), progress)()
 				})
@@ -200,7 +200,7 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case inputConfirmMove:
 				a.runAsyncJob(func(name string, n, total int64) string {
-					return fmt.Sprintf("Moved %s/%s of %s", bytesFormatter(n), bytesFormatter(total), name)
+					return fmt.Sprintf("Moved %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyMove(ctx, a.textbox.Value(), progress)()
 				})
@@ -621,7 +621,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 		// 1. Download from source backend
 		handle, err := src.explorer.Download(ctx, from)
 		if err != nil {
-			return newErrorMsg(err.Error())
+			return check(err)()
 		}
 
 		// We will collect ALL errors here
@@ -679,7 +679,7 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 		// 1. Download from source backend
 		handle, err := src.explorer.Download(ctx, from)
 		if err != nil {
-			return newErrorMsg(err.Error())
+			return check(err)()
 		}
 
 		// We will collect ALL errors here
@@ -795,13 +795,7 @@ func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
 	cmd := exec.Command("open", "-W", handle.Path())
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
-		defer handle.Close()
-
-		if err != nil {
-			return newErrorMsg(err.Error())
-		}
-
-		return nil
+		return check(errors.Join(err, handle.Close()))()
 	})
 }
 
@@ -882,13 +876,33 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		return a, check(err)
 	}
 
+	var listArchive func(string) (string, error)
+
+	if strings.HasSuffix(filename, ".zip") {
+		listArchive = listZip
+	} else if strings.HasSuffix(filename, ".tar") || strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
+		listArchive = listTarGz
+	}
+
+	if listArchive != nil {
+		if s, err := listArchive(handle.Path()); err == nil {
+			if err := handle.Close(); err != nil {
+				return a, check(err)
+			}
+			return a.viewText(s)
+		}
+	}
+
 	info, err := os.Stat(handle.Path())
 
 	if err != nil {
-		return a, check(err)
+		return a, check(errors.Join(err, handle.Close()))
 	}
 
 	if info.Size() > fileViewEditMaxSize {
+		if err := handle.Close(); err != nil {
+			return a, check(err)
+		}
 		return a, failuref(
 			"File %q is too large to view (%s > %s)",
 			filename,
@@ -940,10 +954,13 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	info, err := os.Stat(handle.Path())
 
 	if err != nil {
-		return a, check(err)
+		return a, check(errors.Join(err, handle.Close()))
 	}
 
 	if info.Size() > fileViewEditMaxSize {
+		if err := handle.Close(); err != nil {
+			return a, check(err)
+		}
 		return a, failuref(
 			"File %q is too large to edit (%s > %s)",
 			filename,
@@ -986,16 +1003,20 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	})
 }
 
-func (a *App) runHelp() (tea.Model, tea.Cmd) {
+func (a *App) viewText(text string) (tea.Model, tea.Cmd) {
 	cmd := exec.Command("less", "+1")
-	cmd.Stdin = strings.NewReader(helpText)
+	cmd.Stdin = strings.NewReader(text)
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
-			return newErrorMsg(err.Error())
+			return check(err)()
 		}
 		return nil
 	})
+}
+
+func (a *App) runHelp() (tea.Model, tea.Cmd) {
+	return a.viewText(helpText)
 }
 
 func formatMetadata(meta map[string]string) string {

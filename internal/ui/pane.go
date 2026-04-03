@@ -128,15 +128,43 @@ func (f *FileItem) isMoveable() bool {
 }
 
 func (f *FileItem) isViewable() bool {
-	return !f.Info.IsDir && !f.Info.IsSymlink
+	if f.isArchive() {
+		return true
+	}
+
+	return (!f.Info.IsDir && !f.Info.IsSymlink) && f.Info.Size <= fileViewEditMaxSize
 }
 
 func (f *FileItem) isEditable() bool {
-	return !f.Info.IsDir && !f.Info.IsSymlink
+	return (!f.Info.IsDir && !f.Info.IsSymlink) && f.Info.Size <= fileViewEditMaxSize
 }
 
 func (f *FileItem) hasMetadata() bool {
 	return !f.Info.IsDir || f.Info.Name != ".."
+}
+
+func (f *FileItem) isArchive() bool {
+	if !f.Info.IsDir && !f.Info.IsSymlink {
+		return false
+	}
+
+	if strings.HasSuffix(f.Info.Name, ".zip") {
+		return true
+	}
+
+	if strings.HasSuffix(f.Info.Name, ".tar") {
+		return true
+	}
+
+	if strings.HasSuffix(f.Info.Name, ".tar.gz") {
+		return true
+	}
+
+	if strings.HasSuffix(f.Info.Name, ".tgz") {
+		return true
+	}
+
+	return false
 }
 
 func (f *FileItem) TitleNoIcons() string {
