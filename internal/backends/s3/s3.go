@@ -361,7 +361,7 @@ func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 	return err
 }
 
-func (e *explorer) Download(ctx context.Context, p string) (file.Temp, error) {
+func (e *explorer) Download(ctx context.Context, p string, progress file.ProgressFunc) (file.Temp, error) {
 	key := e.abs(p)
 
 	out, err := e.client.GetObject(ctx, &s3.GetObjectInput{
@@ -378,7 +378,15 @@ func (e *explorer) Download(ctx context.Context, p string) (file.Temp, error) {
 		return nil, err
 	}
 
-	if _, err := io.Copy(f, out.Body); err != nil {
+	var pr io.Reader = out.Body
+
+	if progress != nil {
+		pr = file.AsProgressReader(ctx, out.Body, func(n int64) {
+			progress(p, n, 0)
+		})
+	}
+
+	if _, err := io.Copy(f, pr); err != nil {
 		f.Close()
 		os.Remove(f.Name())
 		return nil, err

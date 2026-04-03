@@ -42,7 +42,7 @@ type Explorer interface {
 	Delete(ctx context.Context, path string) error
 	Mkdir(ctx context.Context, path string) error
 	Rename(ctx context.Context, oldPath, newPath string) error
-	Download(ctx context.Context, path string) (Temp, error)
+	Download(ctx context.Context, path string, progress ProgressFunc) (Temp, error)
 	UploadFrom(ctx context.Context, localPath, destPath string, progress ProgressFunc) error
 	Metadata(ctx context.Context, path string) (map[string]string, error)
 }

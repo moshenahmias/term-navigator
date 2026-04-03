@@ -403,7 +403,7 @@ func (e *Explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Download(ctx context.Context, p string) (file.Temp, error) {
+func (e *Explorer) Download(ctx context.Context, p string, progress file.ProgressFunc) (file.Temp, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -422,8 +422,17 @@ func (e *Explorer) Download(ctx context.Context, p string) (file.Temp, error) {
 		return nil, err
 	}
 
+	var r io.Reader = bytes.NewReader(n.data)
+
+	if progress != nil {
+		size := int64(len(n.data))
+		r = file.AsProgressReader(ctx, r, func(n int64) {
+			progress(p, n, size)
+		})
+	}
+
 	// Write the in-memory file contents
-	if _, err := f.Write(n.data); err != nil {
+	if _, err := io.Copy(f, r); err != nil {
 		f.Close()
 		os.Remove(f.Name())
 		return nil, err

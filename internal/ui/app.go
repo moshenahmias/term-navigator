@@ -619,7 +619,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(ctx, from)
+		handle, err := src.explorer.Download(ctx, from, progress)
 		if err != nil {
 			return check(err)()
 		}
@@ -677,7 +677,7 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 
 	return func() tea.Msg {
 		// 1. Download from source backend
-		handle, err := src.explorer.Download(ctx, from)
+		handle, err := src.explorer.Download(ctx, from, progress)
 		if err != nil {
 			return check(err)()
 		}
@@ -787,7 +787,7 @@ func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	handle, err := pane.explorer.Download(a.ctx, path)
+	handle, err := pane.explorer.Download(a.ctx, path, nil)
 	if err != nil {
 		return a, check(err)
 	}
@@ -871,7 +871,7 @@ func (a *App) runView() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
-	handle, err := pane.explorer.Download(a.ctx, filename)
+	handle, err := pane.explorer.Download(a.ctx, filename, nil)
 	if err != nil {
 		return a, check(err)
 	}
@@ -946,7 +946,7 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
-	handle, err := pane.explorer.Download(a.ctx, filename)
+	handle, err := pane.explorer.Download(a.ctx, filename, nil)
 	if err != nil {
 		return a, check(err)
 	}

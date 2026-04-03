@@ -220,7 +220,7 @@ func (l *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 	return os.Rename(absOld, absNew)
 }
 
-func (l *explorer) Download(ctx context.Context, path string) (file.Temp, error) {
+func (l *explorer) Download(ctx context.Context, path string, _ file.ProgressFunc) (file.Temp, error) {
 	if path == "" {
 		return nil, errors.New("invalid path")
 	}
