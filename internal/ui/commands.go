@@ -15,16 +15,21 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
+type command struct {
+	f       func(a *App, args []string) tea.Cmd
+	aliases []string
+}
+
 var (
-	commands = map[string]func(*App, []string) tea.Cmd{
-		"help": func(a *App, args []string) tea.Cmd {
+	commands = map[string]command{
+		"help": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: help")
 			}
 			_, cmd := a.runHelp()
 			return cmd
-		},
-		"rename": func(a *App, args []string) tea.Cmd {
+		}},
+		"rename": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: rename <old> <new>")
 			}
@@ -32,8 +37,8 @@ var (
 			active := a.activePane()
 
 			return a.applyRenameInner(active, args[0], args[1])
-		},
-		"view": func(a *App, args []string) tea.Cmd {
+		}},
+		"view": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: view <filename>")
 			}
@@ -41,8 +46,8 @@ var (
 			active := a.activePane()
 			_, cmd := a.runViewInner(active, args[0])
 			return cmd
-		},
-		"edit": func(a *App, args []string) tea.Cmd {
+		}},
+		"edit": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: edit <filename>")
 			}
@@ -50,8 +55,8 @@ var (
 			active := a.activePane()
 			_, cmd := a.runEditInner(active, args[0])
 			return cmd
-		},
-		"copy": func(a *App, args []string) tea.Cmd {
+		}},
+		"copy": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: copy <src> <dest>")
 			}
@@ -72,8 +77,8 @@ var (
 			})
 
 			return nil
-		},
-		"move": func(a *App, args []string) tea.Cmd {
+		}, aliases: []string{"cp"}},
+		"move": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: move <src> <dest>")
 			}
@@ -94,22 +99,22 @@ var (
 			})
 
 			return nil
-		},
-		"mkdir": func(a *App, args []string) tea.Cmd {
+		}, aliases: []string{"mv"}},
+		"mkdir": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: mkdir <name>")
 			}
 
 			return a.applyMakeDir(args[0])
-		},
-		"delete": func(a *App, args []string) tea.Cmd {
+		}},
+		"delete": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: delete <name>")
 			}
 
 			return a.applyDeleteInner(a.activePane(), args[0])
-		},
-		"info": func(a *App, args []string) tea.Cmd {
+		}, aliases: []string{"del"}},
+		"info": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: info <filename>")
 			}
@@ -117,8 +122,8 @@ var (
 			active := a.activePane()
 			_, cmd := a.runMetadataInner(active, args[0])
 			return cmd
-		},
-		"device": func(a *App, args []string) tea.Cmd {
+		}},
+		"device": {f: func(a *App, args []string) tea.Cmd {
 			if len(a.devs) < 2 {
 				return nil
 			}
@@ -132,23 +137,23 @@ var (
 			}
 
 			return a.applyChangeDevice(args[0])
-		},
-		"swap": func(a *App, args []string) tea.Cmd {
+		}, aliases: []string{"dev"}},
+		"swap": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: swap")
 			}
 
 			_, cmd := a.runSwapDevices()
 			return cmd
-		},
-		"exit": func(a *App, args []string) tea.Cmd {
+		}},
+		"exit": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: exit")
 			}
 
 			return tea.Quit
-		},
-		"config": func(a *App, args []string) tea.Cmd {
+		}, aliases: []string{"quit", "bye"}},
+		"config": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: config")
 			}
@@ -161,8 +166,8 @@ var (
 			cmd := execDefaultEditor(path, true)
 
 			return tea.ExecProcess(cmd, execResolve("Restart required for changes to take effect"))
-		},
-		"exec": func(a *App, args []string) tea.Cmd {
+		}, aliases: []string{"cfg"}},
+		"exec": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) == 0 {
 				return failure("Usage: exec <command>")
 			}
@@ -180,13 +185,13 @@ var (
 				msg = strings.ReplaceAll(msg, "\n", " ")
 				return newStatusMsg(msg)
 			})
-		},
-		"refresh": func(a *App, args []string) tea.Cmd {
+		}},
+		"refresh": {f: func(a *App, args []string) tea.Cmd {
 			a.left.refresh()
 			a.right.refresh()
 			return nil
-		},
-		"cd": func(a *App, args []string) tea.Cmd {
+		}},
+		"cd": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: cd <folder>")
 			}
@@ -212,8 +217,8 @@ var (
 			active.refresh()
 
 			return nil
-		},
-		"shell": func(a *App, args []string) tea.Cmd {
+		}},
+		"shell": {f: func(a *App, args []string) tea.Cmd {
 			if len(args) != 1 {
 				return func() tea.Msg {
 					return newErrorMsg("Usage: shell")
@@ -231,17 +236,18 @@ var (
 			cmd.Stderr = os.Stderr
 
 			return tea.ExecProcess(cmd, execResolve("Returned from shell"))
-		},
+		}},
 	}
-	commandAlias = map[string]string{
-		"cp":   "copy",
-		"quit": "exit",
-		"mv":   "move",
-		"dev":  "device",
-		"del":  "delete",
-		"cfg":  "config",
-	}
+	commandAlias = make(map[string]string)
 )
+
+func init() {
+	for name, cmd := range commands {
+		for _, alias := range cmd.aliases {
+			commandAlias[alias] = name
+		}
+	}
+}
 
 func (a *App) runCommand() (tea.Model, tea.Cmd) {
 	a.inputMode = inputCommand
@@ -252,7 +258,10 @@ func (a *App) runCommand() (tea.Model, tea.Cmd) {
 	if active := a.activePane(); active != nil {
 		for cmd := range commands {
 			for _, item := range active.list.Items() {
-				suggestions = append(suggestions, fmt.Sprintf("%s %s", cmd, item.(*FileItem).Info.Name))
+				name := item.(*FileItem).Info.Name
+				if name != ".." {
+					suggestions = append(suggestions, fmt.Sprintf("%s %s", cmd, name))
+				}
 			}
 		}
 	}
@@ -282,7 +291,7 @@ func (a *App) applyCommand(text string) tea.Cmd {
 	}
 
 	if cmd, exists := commands[name]; exists {
-		return cmd(a, args[1:])
+		return cmd.f(a, args[1:])
 	}
 
 	return failure(fmt.Sprintf("Unknown command: %q", args[0]))
