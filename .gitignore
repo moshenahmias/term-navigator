@@ -27,4 +27,3 @@ go.work.sum
 bin/
 dist/
 **/__debug_*
-
