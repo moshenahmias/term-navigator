@@ -878,9 +878,13 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 	var listArchive func(string) (string, error)
 
-	if strings.HasSuffix(filename, ".zip") {
+	switch {
+	case strings.HasSuffix(filename, ".zip"):
 		listArchive = listZip
-	} else if strings.HasSuffix(filename, ".tar") || strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
+
+	case strings.HasSuffix(filename, ".tar"),
+		strings.HasSuffix(filename, ".tar.gz"),
+		strings.HasSuffix(filename, ".tgz"):
 		listArchive = listTarGz
 	}
 

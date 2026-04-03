@@ -144,27 +144,20 @@ func (f *FileItem) hasMetadata() bool {
 }
 
 func (f *FileItem) isArchive() bool {
-	if !f.Info.IsDir && !f.Info.IsSymlink {
+	if f.Info.IsDir || f.Info.IsSymlink {
 		return false
 	}
 
-	if strings.HasSuffix(f.Info.Name, ".zip") {
-		return true
+	switch {
+	case strings.HasSuffix(f.Info.Name, ".zip"):
+	case strings.HasSuffix(f.Info.Name, ".tar"):
+	case strings.HasSuffix(f.Info.Name, ".tar.gz"):
+	case strings.HasSuffix(f.Info.Name, ".tgz"):
+	default:
+		return false
 	}
 
-	if strings.HasSuffix(f.Info.Name, ".tar") {
-		return true
-	}
-
-	if strings.HasSuffix(f.Info.Name, ".tar.gz") {
-		return true
-	}
-
-	if strings.HasSuffix(f.Info.Name, ".tgz") {
-		return true
-	}
-
-	return false
+	return true
 }
 
 func (f *FileItem) TitleNoIcons() string {
@@ -186,6 +179,8 @@ func (f *FileItem) Title() string {
 		icon = "🔗"
 	case f.Info.IsDir:
 		icon = "📁"
+	case f.isArchive():
+		icon = "📦"
 	default:
 		icon = "📄"
 	}
