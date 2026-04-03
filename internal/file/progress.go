@@ -36,3 +36,27 @@ func AsProgressReader(ctx context.Context, r io.Reader, callback TotalReadFunc) 
 		ctx:      ctx,
 	}
 }
+
+type progressReaderSeeker struct {
+	*progressReader
+	seeker io.Seeker
+}
+
+func (p *progressReaderSeeker) Seek(offset int64, whence int) (int64, error) {
+	// If S3 rewinds to the beginning, reset progress
+	if whence == io.SeekStart && offset == 0 {
+		p.count = 0
+	}
+	return p.seeker.Seek(offset, whence)
+}
+
+func AsProgressReadSeeker(ctx context.Context, r io.ReadSeeker, cb TotalReadFunc) io.ReadSeeker {
+	return &progressReaderSeeker{
+		progressReader: &progressReader{
+			r:        r,
+			callback: cb,
+			ctx:      ctx,
+		},
+		seeker: r,
+	}
+}

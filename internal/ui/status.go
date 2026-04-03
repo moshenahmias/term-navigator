@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -20,6 +21,10 @@ func failure(text string) tea.Cmd {
 	return func() tea.Msg {
 		return newErrorMsg(text)
 	}
+}
+
+func failuref(format string, a ...any) tea.Cmd {
+	return failure(fmt.Sprintf(format, a...))
 }
 
 func execCheck() tea.ExecCallback {

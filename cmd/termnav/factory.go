@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -48,12 +49,26 @@ var (
 				return nil, err
 			}
 
+			tlsConfig, err := NewTLSConfig(TLSConfigOptions{
+				InsecureSkipVerify: dev.InsecureSkipVerify,
+				CAFile:             dev.CAFile,
+				ExpectedCertName:   dev.ExpectedCertName,
+			})
+			if err != nil {
+				return nil, err
+			}
+
 			// Build S3 client
 			client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 				if dev.Endpoint != "" {
 					// MinIO / Localstack / custom S3-compatible
 					o.BaseEndpoint = aws.String(dev.Endpoint)
 					o.UsePathStyle = true
+					o.HTTPClient = &http.Client{
+						Transport: &http.Transport{
+							TLSClientConfig: tlsConfig,
+						},
+					}
 				}
 			})
 

@@ -33,6 +33,11 @@ type DeviceConfig struct {
 	Key      string `json:"key,omitempty"`
 	Secret   string `json:"secret,omitempty"`
 	Endpoint string `json:"endpoint,omitempty"`
+
+	// TLS
+	InsecureSkipVerify bool   `json:"insecure,omitempty"`
+	CAFile             string `json:"ca_file,omitempty"`
+	ExpectedCertName   string `json:"expected_cert_name,omitempty"`
 }
 
 var DefaultDevice = DeviceConfig{

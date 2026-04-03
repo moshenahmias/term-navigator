@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"os/exec"
 	"path"
 	"runtime"
@@ -64,6 +65,7 @@ const (
 	deleteConfirmationText = "DELETE"
 	copyConfirmationText   = "COPY"
 	moveConfirmationText   = "MOVE"
+	fileViewEditMaxSize    = 1024 * 1024 * 4 // 4 MB
 )
 
 var _, jqErr = exec.LookPath("jq")
@@ -880,6 +882,21 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		return a, check(err)
 	}
 
+	info, err := os.Stat(handle.Path())
+
+	if err != nil {
+		return a, check(err)
+	}
+
+	if info.Size() > fileViewEditMaxSize {
+		return a, failuref(
+			"File %q is too large to view (%s > %s)",
+			filename,
+			bytesFormatter(info.Size()),
+			bytesFormatter(fileViewEditMaxSize),
+		)
+	}
+
 	cmd := exec.Command("less", "+1", handle.Path())
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
@@ -918,6 +935,21 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	handle, err := pane.explorer.Download(a.ctx, filename)
 	if err != nil {
 		return a, check(err)
+	}
+
+	info, err := os.Stat(handle.Path())
+
+	if err != nil {
+		return a, check(err)
+	}
+
+	if info.Size() > fileViewEditMaxSize {
+		return a, failuref(
+			"File %q is too large to edit (%s > %s)",
+			filename,
+			bytesFormatter(info.Size()),
+			bytesFormatter(fileViewEditMaxSize),
+		)
 	}
 
 	cmd := execDefaultEditor(handle.Path(), false)
