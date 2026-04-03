@@ -41,7 +41,7 @@ F8   Delete selected item
 F9   Show metadata
 F10  Change device for active pane
 F12  Swap left and right devices
-ESC  Cancel input mode
+ESC  Quit
 
 ======================================================================
 3. DEVICES

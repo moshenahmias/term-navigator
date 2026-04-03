@@ -188,11 +188,11 @@ func (f *FileItem) Description() string {
 	}
 
 	if t.IsZero() {
-		return fmt.Sprintf("%d bytes ", f.Info.Size)
+		return bytesFormatter(f.Info.Size)
 	}
 
-	return fmt.Sprintf("%d bytes • %s ",
-		f.Info.Size,
+	return fmt.Sprintf("%s • %s ",
+		bytesFormatter(f.Info.Size),
 		t.Format("2006-01-02 15:04"))
 }
 
