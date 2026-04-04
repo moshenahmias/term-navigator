@@ -15,6 +15,7 @@ import (
 )
 
 var Version = "dev"
+var defaultConfigPath string
 
 var (
 	configPathFlag *string
@@ -22,8 +23,8 @@ var (
 )
 
 func init() {
-	path, _ := config.Path()
-	configPathFlag = flag.String("config", path, "Path to config file")
+	defaultConfigPath, _ = config.Path()
+	configPathFlag = flag.String("config", defaultConfigPath, "Path to config file")
 }
 
 func main() {
@@ -92,10 +93,14 @@ func run(ctx context.Context) error {
 	done := make(chan struct{})
 
 	if cfgErr != nil {
-		go func() {
-			defer close(done)
-			app.Send(ui.NewLongErrorMsg("failed reading config file: " + cfgErr.Error()))
-		}()
+		if errors.Is(cfgErr, os.ErrNotExist) && *configPathFlag == defaultConfigPath {
+			cfgErr = nil
+		} else {
+			go func() {
+				defer close(done)
+				app.Send(ui.NewLongErrorMsg("failed reading config file: " + cfgErr.Error()))
+			}()
+		}
 	}
 
 	_, err = p.Run()
