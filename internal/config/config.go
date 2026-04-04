@@ -62,11 +62,9 @@ func Path() (string, error) {
 	return path, nil
 }
 
-func Load() (*Config, error) {
-	path, err := Path()
-
-	if err != nil {
-		return &Default, err
+func Load(path string) (*Config, error) {
+	if path == "" {
+		return &Default, nil
 	}
 
 	data, err := os.ReadFile(path)

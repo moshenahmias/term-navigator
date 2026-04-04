@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,18 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/ui"
 )
+
+var Version = "dev"
+
+var (
+	configPathFlag *string
+	versionFlag    = flag.Bool("version", false, "Print version and exit")
+)
+
+func init() {
+	path, _ := config.Path()
+	configPathFlag = flag.String("config", path, "Path to config file")
+}
 
 func main() {
 	ctx := context.Background()
@@ -25,7 +38,14 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	cfg, cfgErr := config.Load()
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(Version)
+		return nil
+	}
+
+	cfg, cfgErr := config.Load(*configPathFlag)
 
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
