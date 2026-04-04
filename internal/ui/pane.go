@@ -322,7 +322,7 @@ func (p *Pane) refresh() {
 		item := &FileItem{Info: fi}
 		li = append(li, item)
 
-		// 🔥 If this item matches the renamed path, remember its index
+		// If this item matches the renamed path, remember its index
 		if p.lastSelectedPath != "" && fi.FullPath == p.lastSelectedPath {
 			if p.explorer.IsRoot(p.ctx) {
 				selectedIndex = i
@@ -404,7 +404,7 @@ func (p *Pane) SetActive(active bool) {
 	p.delegate.active = active
 	p.list.SetDelegate(*p.delegate)
 
-	// 🔥 Re-apply styles so help/status/title don't disappear
+	// Re-apply styles so help/status/title don't disappear
 	styles := list.DefaultStyles(true)
 	p.list.Styles = styles
 }

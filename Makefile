@@ -1,7 +1,11 @@
 .PHONY: build clean test
 
 build:
+	go mod tidy
 	go build -o bin/termnav ./cmd/termnav
+
+install:
+	cp bin/termnav /usr/local/bin/termnav
 
 clean:
 	rm -rf bin/

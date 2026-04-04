@@ -447,14 +447,14 @@ func (a *App) View() tea.View {
 	// 5. Footer
 	footer := a.commandBar()
 
-	// 🔥 6. Status bar
+	// 6. Status bar
 	statusBar := a.renderStatus()
 
 	// 7. Compose final layout
 	out := lipgloss.JoinVertical(
 		lipgloss.Left,
 		panes,
-		statusBar, // 🔥 inserted here
+		statusBar,
 		footer,
 	)
 
