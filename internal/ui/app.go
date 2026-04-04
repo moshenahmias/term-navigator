@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	"github.com/moshenahmias/term-navigator/internal/file"
 
 	"charm.land/bubbles/v2/textinput"
@@ -323,7 +324,6 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 					active.refresh()
 				}
 			}
-
 		case "f1": // Help
 			return a.runHelp()
 		case "f2": // rename
@@ -332,7 +332,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f3": // View
 			return a.runView()
 
-		case "f4": // Edit
+		case "f4": // Edit / Extract
 			return a.runEdit()
 		case "f5":
 			return a.runCopy()
@@ -479,8 +479,14 @@ func (a *App) commandBar() string {
 
 	item, itemSelected := a.activePane().SelectedItem()
 
+	f4 := "Edit"
+
+	if item.isArchive() {
+		f4 = "Extract"
+	}
+
 	footer := fmt.Sprintf(
-		"%s Help   %s Rename   %s View   %s Edit   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Device   %s Swap   %s Quit",
+		"%s Help   %s Rename   %s View   %s %s   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Device   %s Swap   %s Quit",
 		key.Render("F1"),
 		func() lipgloss.Style {
 			if itemSelected && item.isRenamable() {
@@ -490,19 +496,19 @@ func (a *App) commandBar() string {
 			return greyed
 		}().Render("F2"),
 		func() lipgloss.Style {
-			if itemSelected && item.isViewable() {
+			if itemSelected && (item.isViewable() || item.isArchive()) {
 				return key
 			}
 
 			return greyed
 		}().Render("F3"),
 		func() lipgloss.Style {
-			if itemSelected && item.isEditable() {
+			if itemSelected && (item.isEditable() || item.isArchive()) {
 				return key
 			}
 
 			return greyed
-		}().Render("F4"),
+		}().Render("F4"), f4,
 		func() lipgloss.Style {
 			if itemSelected && item.isCopyable() {
 				return key
@@ -948,14 +954,47 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	})
 }
 
-func (a *App) runEdit() (tea.Model, tea.Cmd) {
+func (a *App) runExtract() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
-	item, ok := pane.SelectedItem()
-	if !ok || !item.isEditable() {
+
+	if pane.explorer.Type() != local.Type {
 		return a, nil
 	}
 
-	return a.runEditInner(pane, item.Info.FullPath)
+	item, ok := pane.SelectedItem()
+	if !ok || !item.isArchive() {
+		return a, nil
+	}
+
+	filename := item.Info.FullPath
+
+	switch {
+	case strings.HasSuffix(filename, ".zip"):
+		return a, commands["exec"].f(a, "unzip", "-o", filename)
+	case strings.HasSuffix(filename, ".tar"):
+		return a, commands["exec"].f(a, "tar", "-xf", filename)
+	case strings.HasSuffix(filename, ".tgz"), strings.HasSuffix(filename, ".tar.gz"):
+		return a, commands["exec"].f(a, "tar", "-xzf", filename)
+	}
+
+	return a, nil
+}
+
+func (a *App) runEdit() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	item, ok := pane.SelectedItem()
+	if !ok {
+		return a, nil
+	}
+
+	switch {
+	case item.isArchive():
+		return a.runExtract()
+	case item.isEditable():
+		return a.runEditInner(pane, item.Info.FullPath)
+	}
+
+	return a, nil
 }
 
 func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {

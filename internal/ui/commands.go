@@ -29,21 +29,21 @@ var (
 )
 
 type command struct {
-	f           func(a *App, args []string) tea.Cmd
+	f           func(a *App, args ...string) tea.Cmd
 	aliases     []string
 	suggestions func(*App, string) []string
 }
 
 var (
 	commands = map[string]command{
-		"help": {f: func(a *App, args []string) tea.Cmd {
+		"help": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: help")
 			}
 			_, cmd := a.runHelp()
 			return cmd
 		}},
-		"rename": {f: func(a *App, args []string) tea.Cmd {
+		"rename": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: rename <old> <new>")
 			}
@@ -54,7 +54,7 @@ var (
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
-		"view": {f: func(a *App, args []string) tea.Cmd {
+		"view": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: view <filename>")
 			}
@@ -65,7 +65,7 @@ var (
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
 		}},
-		"edit": {f: func(a *App, args []string) tea.Cmd {
+		"edit": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: edit <filename>")
 			}
@@ -76,7 +76,7 @@ var (
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
 		}},
-		"copy": {f: func(a *App, args []string) tea.Cmd {
+		"copy": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: copy <src> <dest>")
 			}
@@ -100,7 +100,7 @@ var (
 		}, aliases: []string{"cp"}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
-		"move": {f: func(a *App, args []string) tea.Cmd {
+		"move": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 2 {
 				return failure("Usage: move <src> <dest>")
 			}
@@ -124,14 +124,14 @@ var (
 		}, aliases: []string{"mv"}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
-		"mkdir": {f: func(a *App, args []string) tea.Cmd {
+		"mkdir": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: mkdir <name>")
 			}
 
 			return a.applyMakeDir(args[0])
 		}},
-		"delete": {f: func(a *App, args []string) tea.Cmd {
+		"delete": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: delete <name>")
 			}
@@ -140,7 +140,7 @@ var (
 		}, aliases: []string{"del"}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
-		"info": {f: func(a *App, args []string) tea.Cmd {
+		"info": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: info <filename>")
 			}
@@ -151,7 +151,7 @@ var (
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
-		"device": {f: func(a *App, args []string) tea.Cmd {
+		"device": {f: func(a *App, args ...string) tea.Cmd {
 			if len(a.devs) < 2 {
 				return nil
 			}
@@ -171,7 +171,7 @@ var (
 			}
 			return
 		}},
-		"swap": {f: func(a *App, args []string) tea.Cmd {
+		"swap": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: swap")
 			}
@@ -179,14 +179,14 @@ var (
 			_, cmd := a.runSwapDevices()
 			return cmd
 		}},
-		"exit": {f: func(a *App, args []string) tea.Cmd {
+		"exit": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: exit")
 			}
 
 			return tea.Quit
 		}, aliases: []string{"quit", "bye"}},
-		"config": {f: func(a *App, args []string) tea.Cmd {
+		"config": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: config")
 			}
@@ -200,7 +200,7 @@ var (
 
 			return tea.ExecProcess(cmd, execResolve("Restart required for changes to take effect"))
 		}, aliases: []string{"cfg"}},
-		"exec": {f: func(a *App, args []string) tea.Cmd {
+		"exec": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) == 0 {
 				return failure("Usage: exec <command>")
 			}
@@ -228,12 +228,12 @@ var (
 				return newStatusMsg(msg)
 			})
 		}},
-		"refresh": {f: func(a *App, args []string) tea.Cmd {
+		"refresh": {f: func(a *App, args ...string) tea.Cmd {
 			a.left.refresh()
 			a.right.refresh()
 			return nil
 		}},
-		"cd": {f: func(a *App, args []string) tea.Cmd {
+		"cd": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {
 				return failure("Usage: cd <folder>")
 			}
@@ -262,7 +262,7 @@ var (
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, dirsOnlyItemSuggestionsFilter)
 		}},
-		"shell": {f: func(a *App, args []string) tea.Cmd {
+		"shell": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return func() tea.Msg {
 					return newErrorMsg("Usage: shell")
@@ -370,7 +370,7 @@ func (a *App) applyCommand(text string) tea.Cmd {
 	}
 
 	if cmd, exists := commands[name]; exists {
-		return cmd.f(a, args[1:])
+		return cmd.f(a, args[1:]...)
 	}
 
 	return failure(fmt.Sprintf("Unknown command: %q", args[0]))
