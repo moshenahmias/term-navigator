@@ -7,10 +7,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-const defaultStatusDuration = time.Second * 5
+const (
+	defaultStatusDuration = time.Second * 5
+	defaultErrorDuration  = time.Second * 10
+)
 
 func newErrorMsg(text string) tea.Msg {
-	return statusMsg{text: text, isErr: true, d: defaultStatusDuration}
+	return statusMsg{text: text, isErr: true, d: defaultErrorDuration}
 }
 
 func newStatusMsg(text string) tea.Msg {
@@ -66,4 +69,8 @@ func resolve(err error, or string) tea.Cmd {
 
 func status(text string) tea.Cmd {
 	return resolve(nil, text)
+}
+
+func statusf(format string, a ...any) tea.Cmd {
+	return status(fmt.Sprintf(format, a...))
 }

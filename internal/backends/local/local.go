@@ -12,6 +12,8 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
+const Type = "local"
+
 type explorer struct {
 	cwd string
 }
@@ -31,8 +33,12 @@ func (l *explorer) Copy() file.Explorer {
 	return &cp
 }
 
+func (l *explorer) Type() string {
+	return Type
+}
+
 func (l *explorer) DeviceID(context.Context) string {
-	return "local"
+	return Type
 }
 
 func (l *explorer) Cwd(context.Context) string {

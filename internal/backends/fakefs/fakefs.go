@@ -96,7 +96,9 @@ func (e *Explorer) Copy() file.Explorer {
 	}
 }
 
-func (e *Explorer) DeviceID(context.Context) string { return "fakefs" }
+func (e *Explorer) Type() string { return "fakefs" }
+
+func (e *Explorer) DeviceID(context.Context) string { return e.Type() }
 
 func (e *Explorer) Cwd(context.Context) string {
 	e.mu.RLock()

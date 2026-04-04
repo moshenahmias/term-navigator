@@ -25,6 +25,7 @@ type Temp interface {
 type ProgressFunc func(name string, n, total int64)
 
 type Explorer interface {
+	Type() string
 	Copy() Explorer
 	DeviceID(ctx context.Context) string
 	Cwd(ctx context.Context) string

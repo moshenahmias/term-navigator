@@ -31,6 +31,8 @@ type explorer struct {
 
 var _ file.Explorer = (*explorer)(nil)
 
+const deviceType = "s3"
+
 func NewExplorer(client *s3.Client, endpoint, region, bucket, startPrefix string) file.Explorer {
 	p := strings.TrimPrefix(startPrefix, "/")
 	if p != "" && !strings.HasSuffix(p, "/") {
@@ -40,9 +42,9 @@ func NewExplorer(client *s3.Client, endpoint, region, bucket, startPrefix string
 	var id string
 
 	if endpoint != "" {
-		id = fmt.Sprintf("s3:%s/%s/%s", endpoint, region, bucket)
+		id = fmt.Sprintf("%s:%s/%s/%s", deviceType, endpoint, region, bucket)
 	} else {
-		id = fmt.Sprintf("s3:%s/%s", region, bucket)
+		id = fmt.Sprintf("%s:%s/%s", deviceType, region, bucket)
 	}
 
 	return &explorer{
@@ -58,6 +60,10 @@ func NewExplorer(client *s3.Client, endpoint, region, bucket, startPrefix string
 func (e *explorer) Copy() file.Explorer {
 	cp := *e // shallow copy
 	return &cp
+}
+
+func (e *explorer) Type() string {
+	return deviceType
 }
 
 func (e *explorer) DeviceID(ctx context.Context) string {

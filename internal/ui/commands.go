@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	"github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
@@ -203,7 +204,13 @@ var (
 			if len(args) == 0 {
 				return failure("Usage: exec <command>")
 			}
+
 			pane := a.activePane()
+
+			if pane.explorer.Type() != local.Type {
+				return failuref("exec works only for local devices")
+			}
+
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Dir = pane.explorer.Cwd(a.ctx)
 			var out bytes.Buffer
@@ -268,7 +275,13 @@ var (
 			}
 
 			cmd := exec.Command(shell)
-			cmd.Dir = a.activePane().explorer.Cwd(a.ctx)
+
+			pane := a.activePane()
+
+			if pane.explorer.Type() == local.Type {
+				cmd.Dir = a.activePane().explorer.Cwd(a.ctx)
+			}
+
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr

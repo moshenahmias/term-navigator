@@ -597,7 +597,7 @@ func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 	// Refresh both panes that show this directory
 	a.refreshPanesForExplorer(exp)
 
-	return status(fmt.Sprintf("Renamed %q to %q", oldPath, newPath))
+	return statusf("Renamed %q to %q", oldPath, newPath)
 }
 
 func (a *App) applyCopy(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
@@ -737,7 +737,7 @@ func (a *App) applyMakeDir(text string) tea.Cmd {
 	active.lastSelectedPath = newDirPath
 	a.refreshPanesForExplorer(active.explorer)
 
-	return status(fmt.Sprintf("Created directory %q", newDirPath))
+	return statusf("Created directory %q", newDirPath)
 }
 
 func (a *App) applyDelete(text string) tea.Cmd {
@@ -766,7 +766,7 @@ func (a *App) applyDeleteInner(pane *Pane, target string) tea.Cmd {
 	// Refresh both panes that show this directory
 	a.refreshPanesForExplorer(pane.explorer)
 
-	return status(fmt.Sprintf("Deleted %q", target))
+	return statusf("Deleted %q", target)
 }
 
 func (a *App) applyChangeDevice(text string) tea.Cmd {
@@ -788,7 +788,7 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 	// Refresh both panes that show this directory
 	pane.refresh()
 
-	return status(fmt.Sprintf("Changed device to %q", text))
+	return statusf("Changed device to %q", text)
 }
 
 func (a *App) runOpen(pane *Pane, path string) (tea.Model, tea.Cmd) {
