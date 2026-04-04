@@ -81,7 +81,12 @@ var inputText = map[inputMode]string{
 	inputConfirmCopy:   fmt.Sprintf("Type %s to confirm:", copyConfirmationText),
 	inputConfirmMove:   fmt.Sprintf("Type %s to confirm:", moveConfirmationText),
 	inputChangeDevice:  "Switch to:",
-	inputCommand:       "Type help for available commands:",
+	inputCommand: fmt.Sprintf("Type 'help' for commands (Use %s+↓↑ or TAB for completion):", func() string {
+		if runtime.GOOS == "darwin" {
+			return "⌥"
+		}
+		return "ALT"
+	}()),
 }
 
 var _ tea.Model = (*App)(nil)
@@ -675,7 +680,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 
 		// 5. If any errors occurred, show them
 		if len(errs) > 0 {
-			return newErrorMsg(strings.Join(errs, " | "))
+			return newLongErrorMsg(errs...)
 		}
 		return newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
 	}
@@ -742,7 +747,7 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 
 		// 6. If any errors occurred, show them
 		if len(errs) > 0 {
-			return newErrorMsg(strings.Join(errs, " | "))
+			return newLongErrorMsg(errs...)
 		}
 
 		return newStatusMsg(fmt.Sprintf("Moved %q to %q", from, dstPath))
@@ -965,7 +970,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 3. return combined error or nil
 		if len(errs) > 0 {
-			return newErrorMsg(strings.Join(errs, " | "))
+			return newLongErrorMsg(errs...)
 		}
 
 		return nil
@@ -1063,7 +1068,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 4. Return combined error or nil
 		if len(errs) > 0 {
-			return newErrorMsg(strings.Join(errs, " | "))
+			return newLongErrorMsg(errs...)
 		}
 
 		pane.lastSelectedPath = filename
@@ -1109,7 +1114,7 @@ func formatMetadata(meta map[string]string) string {
 func (a *App) runMetadata() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
-	if !ok {
+	if !ok || item.isParentDir() {
 		return a, nil
 	}
 
