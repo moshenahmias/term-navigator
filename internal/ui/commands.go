@@ -203,8 +203,9 @@ var (
 			if len(args) == 0 {
 				return failure("Usage: exec <command>")
 			}
-
+			pane := a.activePane()
 			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Dir = pane.explorer.Cwd(a.ctx)
 			var out bytes.Buffer
 			cmd.Stdout = &out
 
@@ -215,6 +216,8 @@ var (
 				msg := strings.ReplaceAll(out.String(), "\r\n", " ")
 				msg = strings.ReplaceAll(msg, "\r", " ")
 				msg = strings.ReplaceAll(msg, "\n", " ")
+				a.left.refresh()
+				a.right.refresh()
 				return newStatusMsg(msg)
 			})
 		}},
@@ -253,7 +256,7 @@ var (
 			return a.generateItemSuggestions(s, dirsOnlyItemSuggestionsFilter)
 		}},
 		"shell": {f: func(a *App, args []string) tea.Cmd {
-			if len(args) != 1 {
+			if len(args) != 0 {
 				return func() tea.Msg {
 					return newErrorMsg("Usage: shell")
 				}
@@ -265,6 +268,7 @@ var (
 			}
 
 			cmd := exec.Command(shell)
+			cmd.Dir = a.activePane().explorer.Cwd(a.ctx)
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
