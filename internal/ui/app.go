@@ -651,6 +651,8 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 		// We will collect ALL errors here
 		var errs []string
 
+		name = handle.Dest(name)
+
 		// 2. Upload to destination backend
 		dstPath := path.Join(dst.explorer.Cwd(ctx), name)
 
@@ -708,6 +710,8 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 
 		// We will collect ALL errors here
 		var errs []string
+
+		name = handle.Dest(name)
 
 		// 2. Upload to destination backend
 		dstPath := path.Join(dst.explorer.Cwd(ctx), name)

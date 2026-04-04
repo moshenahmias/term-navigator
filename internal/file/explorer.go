@@ -19,6 +19,7 @@ type Info struct {
 
 type Temp interface {
 	Path() string
+	Dest(name string) string
 	Close() error
 }
 

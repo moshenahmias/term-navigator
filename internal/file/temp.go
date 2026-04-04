@@ -2,13 +2,30 @@ package file
 
 import "os"
 
-type realTemp struct {
-	path string
+type TempOpts struct {
+	Path string
+	Dest func(string) string
 }
 
-var _ Temp = (*realTemp)(nil)
+type baseTemp struct {
+	path string
+	dest func(string) string
+}
 
-func (t *realTemp) Path() string { return t.path }
+func (t *baseTemp) Path() string {
+	return t.path
+}
+
+func (t *baseTemp) Dest(name string) string {
+	if t.dest == nil {
+		return name
+	}
+	return t.dest(name)
+}
+
+type realTemp struct {
+	baseTemp
+}
 
 func (t *realTemp) Close() error {
 	if t.path == "" {
@@ -19,23 +36,28 @@ func (t *realTemp) Close() error {
 	return err
 }
 
-func AsRealTemp(path string) Temp {
+func AsRealTemp(opts TempOpts) Temp {
 	return &realTemp{
-		path: path,
+		baseTemp: baseTemp{
+			path: opts.Path,
+			dest: opts.Dest,
+		},
 	}
 }
 
 type fakeTemp struct {
-	path string
+	baseTemp
 }
 
-var _ Temp = fakeTemp{}
+func (t *fakeTemp) Close() error {
+	return nil
+}
 
-func (h fakeTemp) Path() string { return h.path }
-func (h fakeTemp) Close() error { return nil } // no-op
-
-func AsFakeTemp(path string) Temp {
+func AsFakeTemp(opts TempOpts) Temp {
 	return &fakeTemp{
-		path: path,
+		baseTemp: baseTemp{
+			path: opts.Path,
+			dest: opts.Dest,
+		},
 	}
 }

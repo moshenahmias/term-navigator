@@ -445,7 +445,7 @@ func (e *Explorer) Download(ctx context.Context, p string, progress file.Progres
 		return nil, err
 	}
 
-	return file.AsRealTemp(f.Name()), nil
+	return file.AsRealTemp(file.TempOpts{Path: f.Name()}), nil
 }
 
 //

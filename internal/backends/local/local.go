@@ -231,7 +231,7 @@ func (l *explorer) Download(ctx context.Context, path string, _ file.ProgressFun
 		return nil, errors.New("invalid path")
 	}
 
-	return file.AsFakeTemp(path), nil
+	return file.AsFakeTemp(file.TempOpts{Path: path}), nil
 }
 
 func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
