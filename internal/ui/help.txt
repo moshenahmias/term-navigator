@@ -12,8 +12,8 @@
 ██║ ╚████║██║  ██║ ╚████╔╝ ██║╚██████╔╝██║  ██║   ██║   ╚██████╔╝██║  ██║
 ╚═╝  ╚═══╝╚═╝  ╚═╝  ╚═══╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-A dual-pane terminal file navigator for local filesystems,
-S3-compatible storage, and in-memory virtual filesystems.
+A dual-pane terminal file navigator for local filesystems
+and S3-compatible storage.
 Navigate, view, edit, copy, move, delete, and inspect files
 across devices.
 
@@ -32,8 +32,8 @@ Tab                Switch active pane
 
 F1   Help
 F2   Rename selected item
-F3   View file (read-only, uses "less")
-F4   Edit file (uses "vi" / "nano" / "pico")
+F3   View file
+F4   Edit file or Extract an archive
 F5   Copy item to the opposite pane
 F6   Move item to the opposite pane
 F7   Create directory
@@ -63,22 +63,56 @@ Switching devices:
 Commands:
 
 help
+    Show help screen.
+
 rename <old> <new>
+    Rename a file or folder.
+
 view <file>
+    View a file in read-only mode.
+
 edit <file>
-copy(cp) <src> <dest>
-move/mv <src> <dest>
+    Open a file in the default editor.
+
+copy (cp) <src> <dest>
+    Copy an item from the active pane to the opposite pane.
+
+move (mv) <src> <dest>
+    Move an item from the active pane to the opposite pane.
+
 mkdir <name>
-delete(del) <name>
+    Create a new directory.
+
+delete (del) <name>
+    Delete a file or directory.
+
 info <file>
-device(dev) <name>
+    Show metadata for a file or directory.
+
+device (dev) <name>
+    Switch the active device/pane to the specified backend.
+
 swap
-exit(quit, bye)
-config(cfg)
+    Swap the left and right panes.
+
+exit (quit, bye)
+    Exit the application.
+
+config (cfg)
+    Open the configuration file in your default editor.
+
 exec <command>
+    Execute a shell command in the current directory (local backend only).
+
 refresh
+    Refresh both panes.
+
 cd <folder>
+    Change directory. Use ".." or the parent entry to go up.
+
 shell
+    Open your system shell in the current directory.
+
 
 ======================================================================
 5. CONFIG FILE (~/.termnav)

@@ -340,10 +340,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runHelp()
 		case "f2": // rename
 			return a.runRename()
-
 		case "f3": // View
 			return a.runView()
-
 		case "f4": // Edit / Extract
 			return a.runEdit()
 		case "f5":
@@ -898,7 +896,7 @@ func (a *App) runDelete() (tea.Model, tea.Cmd) {
 func (a *App) runView() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
-	if !ok || !item.isViewable() {
+	if !ok || (!item.isViewable() && !item.isArchive()) {
 		return a, nil
 	}
 
