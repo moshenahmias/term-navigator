@@ -25,7 +25,7 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	cfg := config.Load()
+	cfg, cfgErr := config.Load()
 
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
@@ -68,9 +68,21 @@ func run(ctx context.Context) error {
 	app.Send = func(m tea.Msg) {
 		p.Send(m)
 	}
-	if _, err := p.Run(); err != nil {
-		return errors.New("failed to run program: " + err.Error())
+
+	done := make(chan struct{})
+
+	if cfgErr != nil {
+		go func() {
+			defer close(done)
+			app.Send(ui.NewLongErrorMsg("failed reading config file: " + cfgErr.Error()))
+		}()
 	}
 
-	return nil
+	_, err = p.Run()
+
+	if cfgErr != nil {
+		<-done
+	}
+
+	return err
 }

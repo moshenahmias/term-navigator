@@ -236,7 +236,7 @@ var (
 
 				a.refreshPanesForExplorer(pane.explorer)
 
-				return newLongStatusMsg(lines...)
+				return NewLongStatusMsg(lines...)
 			})
 		}},
 		"refresh": {f: func(a *App, args ...string) tea.Cmd {

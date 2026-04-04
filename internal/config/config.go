@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -61,21 +62,24 @@ func Path() (string, error) {
 	return path, nil
 }
 
-func Load() *Config {
+func Load() (*Config, error) {
 	path, err := Path()
 
 	if err != nil {
-		return &Default
+		return &Default, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return &Default
+		if errors.Is(err, os.ErrNotExist) {
+			return &Default, nil
+		}
+		return &Default, err
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return &Default
+		return &Default, err
 	}
 
 	var found bool
@@ -98,5 +102,5 @@ func Load() *Config {
 		cfg.Right = cfg.Devices[0].Name
 	}
 
-	return &cfg
+	return &cfg, nil
 }

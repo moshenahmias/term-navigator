@@ -680,7 +680,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 
 		// 5. If any errors occurred, show them
 		if len(errs) > 0 {
-			return newLongErrorMsg(errs...)
+			return NewLongErrorMsg(errs...)
 		}
 		return newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
 	}
@@ -747,7 +747,7 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 
 		// 6. If any errors occurred, show them
 		if len(errs) > 0 {
-			return newLongErrorMsg(errs...)
+			return NewLongErrorMsg(errs...)
 		}
 
 		return newStatusMsg(fmt.Sprintf("Moved %q to %q", from, dstPath))
@@ -970,7 +970,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 3. return combined error or nil
 		if len(errs) > 0 {
-			return newLongErrorMsg(errs...)
+			return NewLongErrorMsg(errs...)
 		}
 
 		return nil
@@ -1068,7 +1068,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 		// 4. Return combined error or nil
 		if len(errs) > 0 {
-			return newLongErrorMsg(errs...)
+			return NewLongErrorMsg(errs...)
 		}
 
 		pane.lastSelectedPath = filename

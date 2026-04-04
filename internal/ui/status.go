@@ -11,6 +11,7 @@ const (
 	defaultFastStatusDuration = time.Second / 2
 	defaultStatusDuration     = time.Second * 5
 	defaultErrorDuration      = time.Second * 10
+	defaultFastErrorDuration  = time.Second * 3
 )
 
 func newLongStatusOrErrorMsg(isErr bool, lines ...string) tea.Msg {
@@ -18,23 +19,29 @@ func newLongStatusOrErrorMsg(isErr bool, lines ...string) tea.Msg {
 		return clearStatusMsg{}
 	}
 
-	msg := statusMsg{text: lines[0], isErr: isErr, d: defaultFastStatusDuration}
+	d := defaultFastStatusDuration
+
+	if isErr {
+		d = defaultFastErrorDuration
+	}
+
+	msg := statusMsg{text: lines[0], isErr: isErr, d: d}
 
 	p := &msg
 
 	for _, s := range lines[1:] {
-		p.next = &statusMsg{text: s, isErr: isErr, d: defaultFastStatusDuration}
+		p.next = &statusMsg{text: s, isErr: isErr, d: d}
 		p = p.next
 	}
 
 	return msg
 }
 
-func newLongStatusMsg(lines ...string) tea.Msg {
+func NewLongStatusMsg(lines ...string) tea.Msg {
 	return newLongStatusOrErrorMsg(false, lines...)
 }
 
-func newLongErrorMsg(lines ...string) tea.Msg {
+func NewLongErrorMsg(lines ...string) tea.Msg {
 	return newLongStatusOrErrorMsg(true, lines...)
 }
 
@@ -47,7 +54,7 @@ func errorsMsg(errs ...error) tea.Msg {
 		}
 	}
 
-	return newLongErrorMsg(lines...)
+	return NewLongErrorMsg(lines...)
 }
 
 func newErrorMsg(text string) tea.Msg {
