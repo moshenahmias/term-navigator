@@ -220,12 +220,16 @@ var (
 				if err != nil {
 					return check(err)
 				}
-				msg := strings.ReplaceAll(out.String(), "\r\n", " ")
-				msg = strings.ReplaceAll(msg, "\r", " ")
-				msg = strings.ReplaceAll(msg, "\n", " ")
-				a.left.refresh()
-				a.right.refresh()
-				return newStatusMsg(msg)
+
+				lines := strings.Split(out.String(), "\n")
+
+				for i := range lines {
+					lines[i] = strings.TrimSpace(lines[i])
+				}
+
+				a.refreshPanesForExplorer(pane.explorer)
+
+				return newLongStatusMsg(lines...)
 			})
 		}},
 		"refresh": {f: func(a *App, args ...string) tea.Cmd {

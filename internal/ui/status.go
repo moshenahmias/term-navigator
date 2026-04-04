@@ -8,9 +8,27 @@ import (
 )
 
 const (
-	defaultStatusDuration = time.Second * 5
-	defaultErrorDuration  = time.Second * 10
+	defaultFastStatusDuration = time.Second / 2
+	defaultStatusDuration     = time.Second * 5
+	defaultErrorDuration      = time.Second * 10
 )
+
+func newLongStatusMsg(lines ...string) tea.Msg {
+	if len(lines) == 0 {
+		return clearStatusMsg{}
+	}
+
+	msg := statusMsg{text: lines[0], isErr: false, d: defaultFastStatusDuration}
+
+	p := &msg
+
+	for _, s := range lines[1:] {
+		p.next = &statusMsg{text: s, isErr: false, d: defaultFastStatusDuration}
+		p = p.next
+	}
+
+	return msg
+}
 
 func newErrorMsg(text string) tea.Msg {
 	return statusMsg{text: text, isErr: true, d: defaultErrorDuration}

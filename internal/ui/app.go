@@ -37,6 +37,7 @@ type statusMsg struct {
 	text  string
 	isErr bool
 	d     time.Duration
+	next  *statusMsg
 }
 
 type clearStatusMsg struct{}
@@ -249,6 +250,10 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return a, tea.Tick(msg.d, func(time.Time) tea.Msg {
+			if msg.next != nil {
+				return *msg.next
+			}
+
 			return clearStatusMsg{}
 		})
 	case clearStatusMsg:
@@ -481,7 +486,7 @@ func (a *App) commandBar() string {
 
 	item, itemSelected := pane.SelectedItem()
 
-	extractEnabled := item.isArchive() && pane.explorer.Type() == local.Type
+	extractEnabled := itemSelected && item.isArchive() && pane.explorer.Type() == local.Type
 
 	f4 := "Edit"
 
@@ -971,6 +976,8 @@ func (a *App) runExtract() (tea.Model, tea.Cmd) {
 	}
 
 	filename := item.Info.FullPath
+
+	pane.lastSelectedPath = filename
 
 	switch {
 	case strings.HasSuffix(filename, ".zip"):
