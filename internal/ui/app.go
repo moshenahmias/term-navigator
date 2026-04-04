@@ -193,6 +193,10 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.applyDelete(a.textbox.Value())
 			case inputConfirmCopy:
 				a.runAsyncJob(func(name string, n, total int64) string {
+					if total < 1 {
+						return fmt.Sprintf("Copied %s of %q", bytesFormatter(n), name)
+					}
+
 					return fmt.Sprintf("Copied %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyCopy(ctx, a.textbox.Value(), progress)()
@@ -202,7 +206,10 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case inputConfirmMove:
 				a.runAsyncJob(func(name string, n, total int64) string {
-					return fmt.Sprintf("Moved %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
+					if total < 1 {
+						return fmt.Sprintf("Moved %s of %q", bytesFormatter(n), name)
+					}
+					return fmt.Sprintf("Moved %s/%s of %q", bytesFormatter(n), name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyMove(ctx, a.textbox.Value(), progress)()
 				})

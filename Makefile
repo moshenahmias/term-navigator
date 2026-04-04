@@ -28,19 +28,19 @@ dist-macos-arm64:
 dist-linux-amd64:
 	mkdir -p dist/linux-amd64/
 	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o dist/linux-amd64/termnav ./cmd/termnav
-	cd dist && zip -j termnav-linux-amd64-$(VERSION).zip linux-amd64/termnav
+	cd dist && tar -czf termnav-linux-amd64-$(VERSION).tar.gz -C linux-amd64 termnav
 
 dist-linux-arm64:
 	mkdir -p dist/linux-arm64/
 	GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=$(VERSION)" -o dist/linux-arm64/termnav ./cmd/termnav
-	cd dist && zip -j termnav-linux-arm64-$(VERSION).zip linux-arm64/termnav
+	cd dist && tar -czf termnav-linux-arm64-$(VERSION).tar.gz -C linux-arm64 termnav
 
 dist-linux-arm:
 	mkdir -p dist/linux-arm/
 	GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "-X main.Version=$(VERSION)" -o dist/linux-arm/termnav ./cmd/termnav
-	cd dist && zip -j termnav-linux-arm-$(VERSION).zip linux-arm/termnav
+	cd dist && tar -czf termnav-linux-arm-$(VERSION).tar.gz -C linux-arm termnav
 
 dist-linux-386:
 	mkdir -p dist/linux-386/
 	GOOS=linux GOARCH=386 go build -ldflags "-X main.Version=$(VERSION)" -o dist/linux-386/termnav ./cmd/termnav
-	cd dist && zip -j termnav-linux-386-$(VERSION).zip linux-386/termnav
+	cd dist && tar -czf termnav-linux-386-$(VERSION).tar.gz -C linux-386 termnav
