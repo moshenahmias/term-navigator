@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -221,10 +222,11 @@ var (
 			cmd.Dir = pane.explorer.Cwd(a.ctx)
 			var out bytes.Buffer
 			cmd.Stdout = &out
+			cmd.Stderr = &out
 
 			return tea.ExecProcess(cmd, func(err error) tea.Msg {
 				if err != nil {
-					return check(err)
+					return check(err)()
 				}
 
 				lines := strings.Split(out.String(), "\n")

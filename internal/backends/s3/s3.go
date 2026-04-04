@@ -395,6 +395,11 @@ func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName strin
 	// Stream each object into the tarball
 	for _, obj := range out.Contents {
 		key := *obj.Key
+		name := strings.TrimPrefix(key, prefix)
+		if name == "" {
+			// S3 directory placeholder (e.g., "folder/")
+			continue
+		}
 
 		// Open object
 		o, err := e.client.GetObject(ctx, &s3.GetObjectInput{
@@ -411,10 +416,20 @@ func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName strin
 
 		// Tar header
 		hdr := &tar.Header{
-			Name:    strings.TrimPrefix(key, prefix),
-			Mode:    0644,
-			Size:    *obj.Size,
+			Name:    name,
 			ModTime: *obj.LastModified,
+		}
+
+		if strings.HasSuffix(key, "/") {
+			// Directory
+			hdr.Typeflag = tar.TypeDir
+			hdr.Mode = 0755
+			hdr.Size = 0
+		} else {
+			// File
+			hdr.Typeflag = tar.TypeReg
+			hdr.Mode = 0644
+			hdr.Size = *obj.Size
 		}
 
 		if err := tw.WriteHeader(hdr); err != nil {
