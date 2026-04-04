@@ -138,6 +138,10 @@ func (f *FileItem) isViewable() bool {
 }
 
 func (f *FileItem) isEditable() bool {
+	if f.isArchive() {
+		return false
+	}
+
 	return (!f.Info.IsDir && !f.Info.IsSymlink) && f.Info.Size <= fileViewEditMaxSize
 }
 

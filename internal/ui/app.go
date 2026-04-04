@@ -477,11 +477,15 @@ func (a *App) commandBar() string {
 		moveTarget = "Left←Move"
 	}
 
-	item, itemSelected := a.activePane().SelectedItem()
+	pane := a.activePane()
+
+	item, itemSelected := pane.SelectedItem()
+
+	extractEnabled := item.isArchive() && pane.explorer.Type() == local.Type
 
 	f4 := "Edit"
 
-	if item.isArchive() {
+	if extractEnabled {
 		f4 = "Extract"
 	}
 
@@ -496,14 +500,14 @@ func (a *App) commandBar() string {
 			return greyed
 		}().Render("F2"),
 		func() lipgloss.Style {
-			if itemSelected && (item.isViewable() || item.isArchive()) {
+			if itemSelected && (item.isViewable() || extractEnabled) {
 				return key
 			}
 
 			return greyed
 		}().Render("F3"),
 		func() lipgloss.Style {
-			if itemSelected && (item.isEditable() || item.isArchive()) {
+			if itemSelected && (item.isEditable() || extractEnabled) {
 				return key
 			}
 
