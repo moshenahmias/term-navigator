@@ -138,6 +138,12 @@ shell
 
 logs
     View logs.
+
+batch <file>
+    Runs a list of Termnav commands from a text file.
+
+switch
+    Switch to the other pane.
 ```
 
 

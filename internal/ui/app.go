@@ -112,6 +112,7 @@ type App struct {
 	lastProgressSent time.Time
 	logger           *slog.Logger
 	logBuffer        fmt.Stringer
+	commands         map[string]command
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -155,6 +156,7 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 		devsHint:  strings.Join(slices.Collect(maps.Keys(devs)), ", "),
 		logger:    logger,
 		logBuffer: logBuffer,
+		commands:  commands,
 	}, nil
 }
 

@@ -116,6 +116,11 @@ shell
 logs
     View logs.
 
+batch <file>
+    Runs a list of termnav commands from a text file.
+
+switch
+    Switch to the other pane.
 
 ======================================================================
 5. CONFIG FILE (~/.termnav)

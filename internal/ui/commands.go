@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -36,6 +37,17 @@ type command struct {
 
 var (
 	commands = map[string]command{
+		"switch": {f: func(a *App, args ...string) tea.Cmd {
+			if len(args) != 0 {
+				return failure("Usage: switch")
+			}
+
+			a.focus = 1 - a.focus
+			a.left.SetActive(a.focus == 0)
+			a.right.SetActive(a.focus == 1)
+
+			return nil
+		}},
 		"logs": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: logs")
@@ -309,6 +321,33 @@ var (
 
 			return tea.ExecProcess(cmd, execResolve("Returned from shell"))
 		}},
+		"batch": {f: func(a *App, args ...string) tea.Cmd {
+			if len(args) != 1 {
+				return func() tea.Msg {
+					return newErrorMsg("Usage: batch <file>")
+				}
+			}
+
+			pane := a.activePane()
+			from := pane.explorer.Join(pane.explorer.Cwd(a.ctx), args[0])
+
+			handle, err := pane.explorer.Download(a.ctx, from, nil)
+			if err != nil {
+				return check(err)
+			}
+
+			return func() tea.Msg {
+				m := a.runBatch(handle.Path())()
+
+				if err := handle.Close(); err != nil {
+					return check(err)()
+				}
+
+				return m
+			}
+		}, suggestions: func(a *App, s string) []string {
+			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
+		}},
 	}
 	commandAlias = make(map[string]string)
 )
@@ -395,4 +434,68 @@ func (a *App) applyCommand(text string) tea.Cmd {
 	}
 
 	return failure(fmt.Sprintf("Unknown command: %q", args[0]))
+}
+
+func (a *App) runBatch(path string) tea.Cmd {
+	f, err := os.Open(path)
+
+	if err != nil {
+		return check(err)
+	}
+
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+
+	var cmds []tea.Cmd
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // skip empty lines and comments
+		}
+
+		args := strings.Fields(line)
+
+		if len(args) == 0 {
+			continue
+		}
+
+		if args[0] == "batch" {
+			return failure("nested batching is not supported")
+		}
+
+		cmd, exists := a.commands[args[0]]
+
+		if !exists {
+			return failuref("unknown command %s", args[0])
+		}
+
+		argsCopy := append([]string(nil), args[1:]...)
+		cmdCopy := cmd
+
+		cmds = append(cmds, func() tea.Msg {
+			c := cmdCopy.f(a, argsCopy...)
+
+			if c == nil {
+				return nil
+			}
+
+			return c()
+		})
+	}
+
+	if err := scanner.Err(); err != nil {
+		return check(err)
+	}
+
+	if len(cmds) > 0 {
+		cmds = append(cmds, func() tea.Msg {
+			a.left.refresh()
+			a.right.refresh()
+			return nil
+		})
+	}
+
+	return tea.Sequence(cmds...)
 }
