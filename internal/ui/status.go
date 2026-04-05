@@ -45,7 +45,7 @@ func NewLongErrorMsg(lines ...string) tea.Msg {
 	return newLongStatusOrErrorMsg(true, lines...)
 }
 
-func errorsMsg(errs ...error) tea.Msg {
+func NewLongErrorMsgFromErrors(errs ...error) tea.Msg {
 	var lines []string
 
 	for _, err := range errs {

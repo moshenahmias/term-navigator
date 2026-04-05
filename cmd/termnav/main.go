@@ -52,7 +52,13 @@ func run(ctx context.Context) error {
 		return nil
 	}
 
-	cfg, cfgErr := config.Load(*configPathFlag)
+	var errs []error
+
+	cfg, err := config.Load(*configPathFlag)
+
+	if err != nil && (!errors.Is(err, os.ErrNotExist) || *configPathFlag != defaultConfigPath) {
+		errs = append(errs, err)
+	}
 
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
@@ -71,7 +77,7 @@ func run(ctx context.Context) error {
 		}
 		constructed, err := constructor(ctx, &devCfg)
 		if err != nil {
-			return fmt.Errorf("failed to create device %d (%s): %w", i, devCfg.Name, err)
+			errs = append(errs, fmt.Errorf("failed to create device %d (%s): %w", i, devCfg.Name, err))
 		}
 
 		if len(constructed) > 0 {
@@ -102,20 +108,16 @@ func run(ctx context.Context) error {
 
 	done := make(chan struct{})
 
-	if cfgErr != nil {
-		if errors.Is(cfgErr, os.ErrNotExist) && *configPathFlag == defaultConfigPath {
-			cfgErr = nil
-		} else {
-			go func() {
-				defer close(done)
-				app.Send(ui.NewLongErrorMsg("failed reading config file: " + cfgErr.Error()))
-			}()
-		}
+	if len(errs) > 0 {
+		go func() {
+			defer close(done)
+			app.Send(ui.NewLongErrorMsgFromErrors(errs...))
+		}()
 	}
 
 	_, err = p.Run()
 
-	if cfgErr != nil {
+	if len(errs) > 0 {
 		<-done
 	}
 
