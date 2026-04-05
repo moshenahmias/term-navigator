@@ -258,6 +258,8 @@ func (a *App) setLiveSuggestions(text string) {
 }
 
 func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
+	active := a.activePane() // left or right
+
 	switch msg := msg.(type) {
 
 	case progressMsg:
@@ -327,7 +329,6 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.right.SetActive(a.focus == 1)
 
 		case "enter":
-			active := a.activePane() // left or right
 
 			info, err := active.Selected()
 
@@ -384,14 +385,15 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	leftCmd := tea.Cmd(nil)
-	rightCmd := tea.Cmd(nil)
+	cmd := tea.Cmd(nil)
 
-	a.left, leftCmd = a.left.Update(msg)
-	a.right, rightCmd = a.right.Update(msg)
+	if a.focus == 0 {
+		a.left, cmd = a.left.Update(msg)
+	} else {
+		a.right, cmd = a.right.Update(msg)
+	}
 
-	return a, tea.Batch(leftCmd, rightCmd)
-
+	return a, cmd
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
