@@ -32,6 +32,7 @@ type DeviceConfig struct {
 	Prefix   string `json:"prefix,omitempty"`
 	Key      string `json:"key,omitempty"`
 	Secret   string `json:"secret,omitempty"`
+	Session  string `json:"session,omitempty"`
 	Endpoint string `json:"endpoint,omitempty"`
 
 	// TLS

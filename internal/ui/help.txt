@@ -153,6 +153,7 @@ Example:
 | prefix               | Prefix inside the bucket                      | s3                       |
 | key                  | Static access key (optional)                  | s3                       |
 | secret               | Static secret key (optional)                  | s3                       |
+| session              | Session token (optional)                      | s3                       |
 | endpoint             | Custom S3-compatible endpoint                 | s3                       |
 | insecure             | Skip TLS verification (dev only)              | s3                       |
 | ca_file              | Path to custom CA bundle                      | s3                       |

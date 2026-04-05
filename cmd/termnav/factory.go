@@ -39,7 +39,7 @@ var (
 			// Credentials override (optional)
 			if dev.Key != "" && dev.Secret != "" {
 				opts = append(opts, config.WithCredentialsProvider(
-					credentials.NewStaticCredentialsProvider(dev.Key, dev.Secret, ""),
+					credentials.NewStaticCredentialsProvider(dev.Key, dev.Secret, dev.Session),
 				))
 			}
 
@@ -63,12 +63,13 @@ var (
 				if dev.Endpoint != "" {
 					// MinIO / Localstack / custom S3-compatible
 					o.BaseEndpoint = aws.String(dev.Endpoint)
-					o.UsePathStyle = true
-					o.HTTPClient = &http.Client{
-						Transport: &http.Transport{
-							TLSClientConfig: tlsConfig,
-						},
-					}
+				}
+
+				o.UsePathStyle = true
+				o.HTTPClient = &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: tlsConfig,
+					},
 				}
 			})
 
