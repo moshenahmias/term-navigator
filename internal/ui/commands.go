@@ -36,6 +36,16 @@ type command struct {
 
 var (
 	commands = map[string]command{
+		"logs": {f: func(a *App, args ...string) tea.Cmd {
+			if len(args) != 0 {
+				return failure("Usage: logs")
+			}
+
+			cmd := exec.Command("less", "+1")
+			cmd.Stdin = strings.NewReader(a.logBuffer.String())
+
+			return tea.ExecProcess(cmd, execCheck())
+		}},
 		"help": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
 				return failure("Usage: help")

@@ -135,6 +135,9 @@ cd <folder>
 
 shell
     Open your system shell in the current directory.
+
+logs
+    View logs.
 ```
 
 

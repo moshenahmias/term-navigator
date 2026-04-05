@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	"github.com/moshenahmias/term-navigator/internal/file"
+	"github.com/moshenahmias/term-navigator/internal/logbuf"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -68,6 +70,7 @@ const (
 	copyConfirmationText   = "COPY"
 	moveConfirmationText   = "MOVE"
 	fileViewEditMaxSize    = 1024 * 1024 * 4 // 4 MB
+	maxLogHistory          = 300
 )
 
 var _, jqErr = exec.LookPath("jq")
@@ -107,6 +110,8 @@ type App struct {
 	asyncJobCancel   context.CancelFunc
 	Send             func(tea.Msg)
 	lastProgressSent time.Time
+	logger           *slog.Logger
+	logBuffer        fmt.Stringer
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -137,14 +142,19 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 
 	leftPane.SetActive(true)
 
+	logBuffer := logbuf.NewLineRingBuffer(maxLogHistory)
+	logger := slog.New(slog.NewTextHandler(logBuffer, nil))
+
 	return &App{
-		left:     leftPane,
-		right:    rightPane,
-		focus:    0,
-		textbox:  ti,
-		ctx:      ctx,
-		devs:     devs,
-		devsHint: strings.Join(slices.Collect(maps.Keys(devs)), ", "),
+		left:      leftPane,
+		right:     rightPane,
+		focus:     0,
+		textbox:   ti,
+		ctx:       ctx,
+		devs:      devs,
+		devsHint:  strings.Join(slices.Collect(maps.Keys(devs)), ", "),
+		logger:    logger,
+		logBuffer: logBuffer,
 	}, nil
 }
 
@@ -259,6 +269,12 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.d <= 0 || msg.text == "" {
 			return a, nil
+		}
+
+		if msg.isErr {
+			a.logger.Error(msg.text)
+		} else {
+			a.logger.Info(msg.text)
 		}
 
 		return a, tea.Tick(msg.d, func(time.Time) tea.Msg {
