@@ -149,12 +149,11 @@ Example:
     {
       "name": "minio",
       "type": "s3",
-      "bucket": "mybucket",
+      "bucket": ["mybucket"],
       "region": "us-east-1",
       "endpoint": "http://localhost:9000",
       "key": "minioadmin",
-      "secret": "minioadmin",
-      "prefix": "projects/"
+      "secret": "minioadmin"
     },
     {
       "name": "demo",

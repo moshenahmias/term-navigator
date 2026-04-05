@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,18 +17,18 @@ import (
 )
 
 var (
-	factory = map[string]func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error){
-		"local": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
+	factory = map[string]func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error){
+		"local": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
 			path := dev.Path
 			if path == "" {
 				path = "."
 			}
-			return local.NewExplorer(path), nil
+			return map[string]file.Explorer{dev.Name: local.NewExplorer(path)}, nil
 		},
-		"fakefs": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
-			return fakefs.NewExplorer(), nil
+		"fakefs": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
+			return map[string]file.Explorer{dev.Name: fakefs.NewExplorer()}, nil
 		},
-		"s3": func(ctx context.Context, dev *appcfg.DeviceConfig) (file.Explorer, error) {
+		"s3": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
 			// Build options dynamically
 			opts := []func(*config.LoadOptions) error{}
 
@@ -73,7 +74,30 @@ var (
 				}
 			})
 
-			return s3exp.NewExplorer(client, dev.Endpoint, dev.Region, dev.Bucket, dev.Prefix), nil
+			if len(dev.Buckets) == 0 {
+				out, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
+				if err != nil {
+					return nil, fmt.Errorf("listing buckets: %w", err)
+				}
+
+				for _, b := range out.Buckets {
+					if b.Name != nil {
+						dev.Buckets = append(dev.Buckets, *b.Name)
+					}
+				}
+			}
+
+			if len(dev.Buckets) == 0 {
+				return nil, nil
+			}
+
+			explorers := make(map[string]file.Explorer, len(dev.Buckets))
+
+			for _, bucket := range dev.Buckets {
+				explorers[fmt.Sprintf("%s/%s", dev.Name, bucket)] = s3exp.NewExplorer(client, dev.Endpoint, dev.Region, bucket, "")
+			}
+
+			return explorers, nil
 		},
 	}
 )

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/moshenahmias/term-navigator/internal/config"
@@ -16,6 +17,7 @@ import (
 
 var Version = "dev"
 var defaultConfigPath string
+var validDevName = regexp.MustCompile(`^[A-Za-z_-]+$`)
 
 var (
 	configPathFlag *string
@@ -25,6 +27,10 @@ var (
 func init() {
 	defaultConfigPath, _ = config.Path()
 	configPathFlag = flag.String("config", defaultConfigPath, "Path to config file")
+}
+
+func isValidDevName(s string) bool {
+	return validDevName.MatchString(s)
 }
 
 func main() {
@@ -51,10 +57,10 @@ func run(ctx context.Context) error {
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
 	for i, devCfg := range cfg.Devices {
-
-		if devCfg.Name == "" {
-			return fmt.Errorf("device %d missing name", i)
+		if !isValidDevName(devCfg.Name) {
+			return fmt.Errorf("device %d name is invalid (allowed: A-Z, a-z, _ or -)", i)
 		}
+
 		if devCfg.Type == "" {
 			return fmt.Errorf("device %d (%s) missing type", i, devCfg.Name)
 		}
@@ -63,16 +69,20 @@ func run(ctx context.Context) error {
 		if !ok {
 			return errors.New("unknown device type: " + devCfg.Type)
 		}
-		dev, err := constructor(ctx, &devCfg)
+		constructed, err := constructor(ctx, &devCfg)
 		if err != nil {
 			return fmt.Errorf("failed to create device %d (%s): %w", i, devCfg.Name, err)
 		}
 
-		if _, exists := devs[devCfg.Name]; exists {
-			return fmt.Errorf("duplicate device name: %s", devCfg.Name)
-		}
+		if len(constructed) > 0 {
+			for name, dev := range constructed {
+				if _, exists := devs[name]; exists {
+					return fmt.Errorf("duplicate device name: %s", name)
+				}
 
-		devs[devCfg.Name] = dev
+				devs[name] = dev
+			}
+		}
 	}
 
 	if len(devs) == 0 {

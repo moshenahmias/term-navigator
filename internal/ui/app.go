@@ -647,8 +647,8 @@ func (a *App) applyCopy(ctx context.Context, text string, progress file.Progress
 }
 
 func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
-	if src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
-		return failure("Source and destination are the same")
+	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
+		return failure("source and destination are the same")
 	}
 
 	return func() tea.Msg {
@@ -707,8 +707,8 @@ func (a *App) applyMove(ctx context.Context, text string, progress file.Progress
 }
 
 func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
-	if src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
-		return failure("Source and destination are the same")
+	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
+		return failure("source and destination are the same")
 	}
 
 	return func() tea.Msg {

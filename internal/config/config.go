@@ -27,13 +27,12 @@ type DeviceConfig struct {
 	Path string `json:"path,omitempty"`
 
 	// S3
-	Bucket   string `json:"bucket,omitempty"`
-	Region   string `json:"region,omitempty"`
-	Prefix   string `json:"prefix,omitempty"`
-	Key      string `json:"key,omitempty"`
-	Secret   string `json:"secret,omitempty"`
-	Session  string `json:"session,omitempty"`
-	Endpoint string `json:"endpoint,omitempty"`
+	Buckets  []string `json:"buckets,omitempty"`
+	Region   string   `json:"region,omitempty"`
+	Key      string   `json:"key,omitempty"`
+	Secret   string   `json:"secret,omitempty"`
+	Session  string   `json:"session,omitempty"`
+	Endpoint string   `json:"endpoint,omitempty"`
 
 	// TLS
 	InsecureSkipVerify bool   `json:"insecure,omitempty"`

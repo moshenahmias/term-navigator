@@ -126,12 +126,11 @@ Example:
     {
       "name": "minio",
       "type": "s3",
-      "bucket": "mybucket",
+      "bucket": ["mybucket"],
       "region": "us-east-1",
       "endpoint": "http://localhost:9000",
       "key": "minioadmin",
-      "secret": "minioadmin",
-      "prefix": "projects/"
+      "secret": "minioadmin"
     },
     {
       "name": "demo",
@@ -148,9 +147,8 @@ Example:
 | name                 | Unique identifier for the device              | local, s3, fakefs        |
 | type                 | Device type ("local", "s3", "fakefs")         | local, s3, fakefs        |
 | path                 | Local filesystem path                         | local                    |
-| bucket               | S3 bucket name                                | s3                       |
+| buckets              | S3 bucket names (optional)                    | s3                       |
 | region               | AWS region (optional)                         | s3                       |
-| prefix               | Prefix inside the bucket                      | s3                       |
 | key                  | Static access key (optional)                  | s3                       |
 | secret               | Static secret key (optional)                  | s3                       |
 | session              | Session token (optional)                      | s3                       |
