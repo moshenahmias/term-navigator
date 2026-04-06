@@ -16,7 +16,7 @@ You can build and install TermNavigator directly from source.
 make build
 ```
 
-This compiles the project into the `dist/` directory for your platform.
+This compiles the project into the `bin/` directory for your platform.
 
 ### Install
 

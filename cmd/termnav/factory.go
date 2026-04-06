@@ -44,6 +44,8 @@ var (
 				))
 			}
 
+			opts = append(opts, config.WithClientLogMode(aws.ClientLogMode(0)))
+
 			// Load config (this will fall back to env/default chain if no overrides)
 			cfg, err := config.LoadDefaultConfig(ctx, opts...)
 			if err != nil {
