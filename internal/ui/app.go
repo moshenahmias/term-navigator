@@ -19,6 +19,7 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/logbuf"
 
+	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
@@ -333,35 +334,46 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.right.SetActive(a.focus == 1)
 
 		case "enter":
+			if active.list.FilterState() != list.Filtering {
+				info, err := active.Selected()
 
-			info, err := active.Selected()
-
-			if err == nil {
-				dst := info.FullPath
-				if info.IsDir || info.IsSymlinkToDir {
-					if info.Name == parentDirName {
-						// Handle parent directory navigation
-						if parent, exists := active.explorer.Parent(a.ctx); exists {
-							dst = parent
-						} else {
-							return a, nil // already at root, do nothing
+				if err == nil {
+					dst := info.FullPath
+					if info.IsDir || info.IsSymlinkToDir {
+						if info.Name == parentDirName {
+							// Handle parent directory navigation
+							if parent, exists := active.explorer.Parent(a.ctx); exists {
+								dst = parent
+							} else {
+								return a, nil // already at root, do nothing
+							}
 						}
+						if err := active.explorer.Chdir(a.ctx, dst); err == nil {
+							active.list.SetFilterText("")
+							active.list.SetFilterState(list.Unfiltered)
+							active.refresh()
+						}
+					} else {
+						// file
+						return a.runOpen(active, dst)
 					}
-					active.explorer.Chdir(a.ctx, dst)
-					active.refresh()
-				} else {
-					// file
-					return a.runOpen(active, dst)
 				}
+
 			}
 		case "backspace":
-			active := a.activePane() // left or right
 
-			if parent, exists := active.explorer.Parent(a.ctx); exists {
-				if err := active.explorer.Chdir(a.ctx, parent); err == nil {
-					active.refresh()
+			if active.list.FilterState() != list.Filtering {
+				if parent, exists := active.explorer.Parent(a.ctx); exists {
+					if err := active.explorer.Chdir(a.ctx, parent); err == nil {
+						active.list.SetFilterText("")
+						active.list.SetFilterState(list.Unfiltered)
+						active.refresh()
+					}
 				}
+
+				//return a, nil
 			}
+
 		case "f1": // Help
 			return a.runHelp()
 		case "f2": // rename
