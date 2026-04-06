@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go/logging"
 	"github.com/moshenahmias/term-navigator/internal/backends/fakefs"
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	s3exp "github.com/moshenahmias/term-navigator/internal/backends/s3"
@@ -44,7 +45,7 @@ var (
 				))
 			}
 
-			opts = append(opts, config.WithClientLogMode(aws.ClientLogMode(0)))
+			opts = append(opts, config.WithClientLogMode(aws.ClientLogMode(0)), config.WithLogger(logging.Nop{}))
 
 			// Load config (this will fall back to env/default chain if no overrides)
 			cfg, err := config.LoadDefaultConfig(ctx, opts...)

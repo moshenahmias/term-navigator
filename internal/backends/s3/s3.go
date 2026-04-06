@@ -444,7 +444,7 @@ func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName strin
 		// Copy object data
 		if progress != nil {
 			pr := file.AsProgressReader(ctx, o.Body, func(n int64) {
-				progress(displayName, n, *obj.Size)
+				progress(*obj.Key, n, *obj.Size)
 			})
 			_, err = io.Copy(tw, pr)
 		} else {
@@ -584,7 +584,7 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 
 			if progress != nil {
 				prs = file.AsProgressReadSeeker(ctx, src, func(n int64) {
-					progress(p, n, fi.Size())
+					progress(fi.Name(), n, fi.Size())
 				})
 			}
 
@@ -608,7 +608,7 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 
 	if progress != nil {
 		prs = file.AsProgressReadSeeker(ctx, src, func(n int64) {
-			progress(localPath, n, info.Size())
+			progress(info.Name(), n, info.Size())
 		})
 	}
 

@@ -134,7 +134,7 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 	rightWidth := width - leftWidth
 
 	ti := textinput.New()
-	ti.CharLimit = 256
+	ti.CharLimit = 512
 	ti.SetWidth(40)
 	ti.ShowSuggestions = true
 
