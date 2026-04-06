@@ -103,12 +103,7 @@ var (
 				return failure("Usage: copy <src> <dest>")
 			}
 
-			src := a.activePane()
-			dst := a.left
-
-			if src == a.left {
-				dst = a.right
-			}
+			src, dst := a.panes()
 
 			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
 
@@ -130,12 +125,7 @@ var (
 				return failure("Usage: move <src> <dest>")
 			}
 
-			src := a.activePane()
-			dst := a.left
-
-			if src == a.left {
-				dst = a.right
-			}
+			src, dst := a.panes()
 
 			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
 

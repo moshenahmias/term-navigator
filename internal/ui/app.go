@@ -85,7 +85,7 @@ var inputText = map[inputMode]string{
 	inputConfirmCopy:   fmt.Sprintf("Type %s to confirm:", copyConfirmationText),
 	inputConfirmMove:   fmt.Sprintf("Type %s to confirm:", moveConfirmationText),
 	inputChangeDevice:  "Switch to:",
-	inputCommand: fmt.Sprintf("Type 'help' for commands (Use %s+↓↑ or TAB for completion):", func() string {
+	inputCommand: fmt.Sprintf("Type 'help' for commands (Use %s+↓↑ + TAB for completion):", func() string {
 		if runtime.GOOS == "darwin" {
 			return "⌥"
 		}
@@ -508,6 +508,18 @@ func (a *App) activePane() *Pane {
 	return a.right
 }
 
+func (a *App) panes() (*Pane, *Pane) {
+	src := a.activePane()
+
+	// pick destination pane
+	dst := a.left
+	if src == a.left {
+		dst = a.right
+	}
+
+	return src, dst
+}
+
 var key = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(lipgloss.Color("#00afff"))
@@ -516,7 +528,7 @@ var greyed = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(lipgloss.Color("#555555"))
 
-func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled bool, f []string, format string) string {
+func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled, sameDir bool, f []string, format string) string {
 	return fmt.Sprintf(
 		format,
 		key.Render("F1"), f[0],
@@ -542,14 +554,14 @@ func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled bool, f [
 			return greyed
 		}().Render("F4"), f[3],
 		func() lipgloss.Style {
-			if itemSelected && item.isCopyable() {
+			if itemSelected && item.isCopyable() && !sameDir {
 				return key
 			}
 
 			return greyed
 		}().Render("F5"), f[4],
 		func() lipgloss.Style {
-			if itemSelected && item.isMoveable() {
+			if itemSelected && item.isMoveable() && !sameDir {
 				return key
 			}
 
@@ -589,11 +601,10 @@ func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled bool, f [
 }
 
 func (a *App) commandBar() string {
-	pane := a.activePane()
-
+	pane, dst := a.panes()
 	item, itemSelected := pane.SelectedItem()
-
 	extractEnabled := itemSelected && item.isArchive() && pane.explorer.Type() == local.Type
+	sameDir := pane.explorer.DeviceID(a.ctx) == dst.explorer.DeviceID(a.ctx) && pane.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx)
 
 	var f [12]string
 
@@ -601,8 +612,8 @@ func (a *App) commandBar() string {
 	f[1] = "Rename"
 	f[2] = "View"
 	f[3] = "Edit"
-	f[4] = "Copy→Right"
-	f[5] = "Move→Right"
+	f[4] = "Copy →"
+	f[5] = "Move →"
 	f[6] = "Mkdir"
 	f[7] = "Delete"
 	f[8] = "Info"
@@ -615,12 +626,12 @@ func (a *App) commandBar() string {
 	}
 
 	if a.focus == 1 {
-		f[4] = "Left←Copy"
-		f[5] = "Left←Move"
+		f[4] = "← Copy"
+		f[5] = "← Move"
 	}
 
 	format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
-	footer := a.buildFooter(item, itemSelected, extractEnabled, f[:], format)
+	footer := a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
 
 	visibleWidth := lipgloss.Width(footer)
 
@@ -637,7 +648,7 @@ func (a *App) commandBar() string {
 		f[9] = "DV"
 		f[10] = "SW"
 		f[11] = "QT"
-		footer = a.buildFooter(item, itemSelected, extractEnabled, f[:], format)
+		footer = a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
 	}
 
 	visibleWidth = lipgloss.Width(footer)
@@ -656,7 +667,7 @@ func (a *App) commandBar() string {
 		f[10] = "S"
 		f[11] = "Q"
 		format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
-		footer = a.buildFooter(item, itemSelected, extractEnabled, f[:], format)
+		footer = a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
 	}
 
 	footerStyled := lipgloss.NewStyle().
@@ -711,13 +722,7 @@ func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 }
 
 func (a *App) applyCopy(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
-	src := a.activePane()
-
-	// pick destination pane
-	dst := a.left
-	if src == a.left {
-		dst = a.right
-	}
+	src, dst := a.panes()
 
 	item, ok := src.SelectedItem()
 	if !ok || !item.isCopyable() {
@@ -733,7 +738,7 @@ func (a *App) applyCopy(ctx context.Context, text string, progress file.Progress
 
 func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
 	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
-		return failure("source and destination are the same")
+		return nil
 	}
 
 	return func() tea.Msg {
@@ -771,13 +776,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 	}
 }
 func (a *App) applyMove(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
-	src := a.activePane()
-
-	// pick destination pane
-	dst := a.left
-	if src == a.left {
-		dst = a.right
-	}
+	src, dst := a.panes()
 
 	item, ok := src.SelectedItem()
 	if !ok || !item.isMoveable() {
@@ -793,7 +792,7 @@ func (a *App) applyMove(ctx context.Context, text string, progress file.Progress
 
 func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
 	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
-		return failure("source and destination are the same")
+		return nil
 	}
 
 	return func() tea.Msg {
@@ -936,8 +935,13 @@ func (a *App) runRename() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runCopy() (tea.Model, tea.Cmd) {
-	pane := a.activePane()
-	if item, ok := pane.SelectedItem(); ok && item.isCopyable() {
+	src, dst := a.panes()
+
+	if src.explorer.DeviceID(a.ctx) == dst.explorer.DeviceID(a.ctx) && src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
+		return a, nil
+	}
+
+	if item, ok := src.SelectedItem(); ok && item.isCopyable() {
 		a.inputMode = inputConfirmCopy
 		a.textbox.SetValue("")
 		a.textbox.Placeholder = copyConfirmationText
@@ -949,8 +953,13 @@ func (a *App) runCopy() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runMove() (tea.Model, tea.Cmd) {
-	pane := a.activePane()
-	if item, ok := pane.SelectedItem(); ok && item.isMoveable() {
+	src, dst := a.panes()
+
+	if src.explorer.DeviceID(a.ctx) == dst.explorer.DeviceID(a.ctx) && src.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx) {
+		return a, nil
+	}
+
+	if item, ok := src.SelectedItem(); ok && item.isMoveable() {
 		a.inputMode = inputConfirmMove
 		a.textbox.SetValue("")
 		a.textbox.Placeholder = moveConfirmationText
