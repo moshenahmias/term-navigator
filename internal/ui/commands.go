@@ -53,7 +53,7 @@ var (
 				return failure("Usage: logs")
 			}
 
-			cmd := exec.Command("less", "+1")
+			cmd := exec.Command("less")
 			cmd.Stdin = strings.NewReader(a.logBuffer.String())
 
 			return tea.ExecProcess(cmd, execCheck())

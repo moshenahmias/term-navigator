@@ -508,103 +508,156 @@ func (a *App) activePane() *Pane {
 	return a.right
 }
 
-func (a *App) commandBar() string {
-	key := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00afff"))
+var key = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#00afff"))
 
-	greyed := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#555555"))
+var greyed = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#555555"))
 
-	copyTarget := "Copy→Right"
-	moveTarget := "Move→Right"
-	if a.focus == 1 {
-		copyTarget = "Left←Copy"
-		moveTarget = "Left←Move"
-	}
-
-	pane := a.activePane()
-
-	item, itemSelected := pane.SelectedItem()
-
-	extractEnabled := itemSelected && item.isArchive() && pane.explorer.Type() == local.Type
-
-	f4 := "Edit"
-
-	if extractEnabled {
-		f4 = "Extract"
-	}
-
-	footer := fmt.Sprintf(
-		"%s Help   %s Rename   %s View   %s %s   %s %s   %s %s   %s Mkdir   %s Delete   %s Info   %s Device   %s Swap   %s Quit",
-		key.Render("F1"),
+func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled bool, f []string, format string) string {
+	return fmt.Sprintf(
+		format,
+		key.Render("F1"), f[0],
 		func() lipgloss.Style {
 			if itemSelected && item.isRenamable() {
 				return key
 			}
 
 			return greyed
-		}().Render("F2"),
+		}().Render("F2"), f[1],
 		func() lipgloss.Style {
 			if itemSelected && (item.isViewable() || extractEnabled) {
 				return key
 			}
 
 			return greyed
-		}().Render("F3"),
+		}().Render("F3"), f[2],
 		func() lipgloss.Style {
 			if itemSelected && (item.isEditable() || extractEnabled) {
 				return key
 			}
 
 			return greyed
-		}().Render("F4"), f4,
+		}().Render("F4"), f[3],
 		func() lipgloss.Style {
 			if itemSelected && item.isCopyable() {
 				return key
 			}
 
 			return greyed
-		}().Render("F5"), copyTarget,
+		}().Render("F5"), f[4],
 		func() lipgloss.Style {
 			if itemSelected && item.isMoveable() {
 				return key
 			}
 
 			return greyed
-		}().Render("F6"), moveTarget,
-		key.Render("F7"),
+		}().Render("F6"), f[5],
+		key.Render("F7"), f[6],
 		func() lipgloss.Style {
 			if itemSelected && item.isDeleteable() {
 				return key
 			}
 
 			return greyed
-		}().Render("F8"),
+		}().Render("F8"), f[7],
 		func() lipgloss.Style {
 			if itemSelected && item.hasMetadata() {
 				return key
 			}
 
 			return greyed
-		}().Render("F9"),
+		}().Render("F9"), f[8],
 		func() lipgloss.Style {
 			if len(a.devs) > 1 {
 				return key
 			}
 
 			return greyed
-		}().Render("F10"),
+		}().Render("F10"), f[9],
 		func() lipgloss.Style {
 			if len(a.devs) > 1 && a.left.name != a.right.name {
 				return key
 			}
 
 			return greyed
-		}().Render("F12"),
-		key.Render("ESC"),
+		}().Render("F12"), f[10],
+		key.Render("ESC"), f[11],
 	)
+}
+
+func (a *App) commandBar() string {
+	pane := a.activePane()
+
+	item, itemSelected := pane.SelectedItem()
+
+	extractEnabled := itemSelected && item.isArchive() && pane.explorer.Type() == local.Type
+
+	var f [12]string
+
+	f[0] = "Help"
+	f[1] = "Rename"
+	f[2] = "View"
+	f[3] = "Edit"
+	f[4] = "Copy→Right"
+	f[5] = "Move→Right"
+	f[6] = "Mkdir"
+	f[7] = "Delete"
+	f[8] = "Info"
+	f[9] = "Device"
+	f[10] = "Swap"
+	f[11] = "Quit"
+
+	if extractEnabled {
+		f[3] = "Extract"
+	}
+
+	if a.focus == 1 {
+		f[4] = "Left←Copy"
+		f[5] = "Left←Move"
+	}
+
+	format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
+	footer := a.buildFooter(item, itemSelected, extractEnabled, f[:], format)
+
+	visibleWidth := lipgloss.Width(footer)
+
+	if visibleWidth > a.width {
+		f[0] = "HL"
+		f[1] = "RN"
+		f[2] = "VW"
+		f[3] = "ED"
+		f[4] = "CP"
+		f[5] = "MV"
+		f[6] = "MD"
+		f[7] = "DL"
+		f[8] = "IN"
+		f[9] = "DV"
+		f[10] = "SW"
+		f[11] = "QT"
+		footer = a.buildFooter(item, itemSelected, extractEnabled, f[:], format)
+	}
+
+	visibleWidth = lipgloss.Width(footer)
+
+	if visibleWidth > a.width {
+		f[0] = "H"
+		f[1] = "R"
+		f[2] = "V"
+		f[3] = "E"
+		f[4] = "C"
+		f[5] = "M"
+		f[6] = "F"
+		f[7] = "D"
+		f[8] = "I"
+		f[9] = "/"
+		f[10] = "S"
+		f[11] = "Q"
+		format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
+		footer = a.buildFooter(item, itemSelected, extractEnabled, f[:], format)
+	}
 
 	footerStyled := lipgloss.NewStyle().
 		Background(lipgloss.Color("#222")).
