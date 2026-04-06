@@ -265,10 +265,12 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case progressMsg:
-		a.msg = statusMsg{text: fmt.Sprintf("%s [ESC]", msg.text), isErr: false}
+		msg.text = strings.NewReplacer("\n", "", "\r", "").Replace(msg.text)
+		a.msg = statusMsg{text: fmt.Sprintf("[ESC] %s", msg.text), isErr: false}
 		return a, nil
 
 	case statusMsg:
+		msg = splitStatusMsgLines(msg)
 		a.msg = msg
 
 		if msg.d <= 0 || msg.text == "" {
@@ -424,8 +426,6 @@ func (a *App) renderStatus() string {
 	}
 
 	return a.msg.text
-
-	//return successStyle.Render(a.msg.text)
 }
 
 func (a *App) View() tea.View {

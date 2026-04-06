@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,6 +14,50 @@ const (
 	defaultErrorDuration      = time.Second * 10
 	defaultFastErrorDuration  = time.Second * 3
 )
+
+func splitStatusMsgLines(msg statusMsg) statusMsg {
+	// Split into raw lines
+	raw := strings.Split(msg.text, "\n")
+
+	// Clean lines: trim spaces and discard empty ones
+	var lines []string
+	for _, line := range raw {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+
+	// If no lines left, return a clear message
+	if len(lines) == 0 {
+		return statusMsg{}
+	}
+
+	// If only one line, return as-is but trimmed
+	if len(lines) == 1 {
+		msg.text = lines[0]
+		return msg
+	}
+
+	// Build linked list
+	head := statusMsg{
+		text:  lines[0],
+		isErr: msg.isErr,
+		d:     msg.d,
+	}
+
+	p := &head
+	for _, line := range lines[1:] {
+		p.next = &statusMsg{
+			text:  line,
+			isErr: msg.isErr,
+			d:     msg.d,
+		}
+		p = p.next
+	}
+
+	return head
+}
 
 func newLongStatusOrErrorMsg(isErr bool, lines ...string) tea.Msg {
 	if len(lines) == 0 {
