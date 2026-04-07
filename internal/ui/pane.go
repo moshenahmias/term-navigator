@@ -258,7 +258,6 @@ func NewPane(ctx context.Context, name string, exp file.Explorer, width, height 
 	styles := list.DefaultStyles(true)
 
 	l.Styles = styles
-	l.Title = exp.PrintableCwd(ctx)
 
 	// Build pane
 	p := &Pane{
@@ -347,6 +346,17 @@ func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
 	return p, cmd
 }
 
+func truncateLeft(s string, width int) string {
+	r := []rune(s)
+	if len(r) <= width {
+		return s
+	}
+	if width <= 1 {
+		return "…"
+	}
+	return " " + string(r[len(r)-width+1:])
+}
+
 func truncate(s string, width int) string {
 	r := []rune(s)
 	if len(r) <= width {
@@ -359,8 +369,8 @@ func truncate(s string, width int) string {
 }
 
 func (p *Pane) View() string {
-	cwd := p.name + " " + p.explorer.PrintableCwd(p.ctx)
-	cwd = truncate(cwd, p.width-2) // account for borders
+	cwd := " " + p.name + " " + p.explorer.PrintableCwd(p.ctx)
+	cwd = truncateLeft(cwd, p.width-3) // account for borders
 
 	header := lipgloss.NewStyle().
 		Bold(true).
