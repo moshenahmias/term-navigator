@@ -33,7 +33,7 @@ var helpText string
 
 var (
 	ncBorder = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()) // simple border
+		Border(lipgloss.DoubleBorder())
 )
 
 type statusMsg struct {
@@ -380,8 +380,11 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runRename()
 		case "f3": // View
 			return a.runView()
+		case "ctrl+e": // Edit + jq
+			return a.runEdit(true)
+
 		case "f4": // Edit / Extract
-			return a.runEdit()
+			return a.runEdit(false)
 		case "f5":
 			return a.runCopy()
 		case "f6":
@@ -1047,7 +1050,14 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		)
 	}
 
-	cmd := exec.Command("less", "+1", handle.Path())
+	var cmd *exec.Cmd
+
+	if jqErr == nil {
+		cmd = exec.Command("sh", "-c",
+			fmt.Sprintf("(jq . %q 2>/dev/null || cat %q) | less +1", handle.Path(), handle.Path()))
+	} else {
+		cmd = exec.Command("less", "+1", handle.Path())
+	}
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
 		var errs []string
@@ -1099,7 +1109,7 @@ func (a *App) runExtract() (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-func (a *App) runEdit() (tea.Model, tea.Cmd) {
+func (a *App) runEdit(jq bool) (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	item, ok := pane.SelectedItem()
 	if !ok {
@@ -1110,13 +1120,13 @@ func (a *App) runEdit() (tea.Model, tea.Cmd) {
 	case item.isArchive():
 		return a.runExtract()
 	case item.isEditable():
-		return a.runEditInner(pane, item.Info.FullPath)
+		return a.runEditInner(pane, item.Info.FullPath, jq)
 	}
 
 	return a, nil
 }
 
-func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
+func (a *App) runEditInner(pane *Pane, filename string, jq bool) (tea.Model, tea.Cmd) {
 	handle, err := pane.explorer.Download(a.ctx, filename, nil)
 	if err != nil {
 		return a, check(err)
@@ -1140,7 +1150,7 @@ func (a *App) runEditInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		)
 	}
 
-	cmd := execDefaultEditor(handle.Path(), false)
+	cmd := execDefaultEditor(handle.Path(), jq)
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
 		var errs []string

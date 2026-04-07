@@ -43,6 +43,8 @@ F10  Change device for active pane
 F12  Swap left and right devices
 ESC  Quit
 
+Ctrl+E: Edit + format with jq
+
 ======================================================================
 3. DEVICES
 ======================================================================
@@ -71,8 +73,8 @@ rename <old> <new>
 view <file>
     View a file in read-only mode.
 
-edit <file>
-    Open a file in the default editor.
+edit <file> [jq]
+    Open a file in the default editor (optional: format using jq).
 
 copy (cp) <src> <dest>
     Copy an item from the active pane to the opposite pane.

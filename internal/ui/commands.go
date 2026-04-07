@@ -88,12 +88,12 @@ var (
 			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
 		}},
 		"edit": {f: func(a *App, args ...string) tea.Cmd {
-			if len(args) != 1 {
-				return failure("Usage: edit <filename>")
+			if len(args) != 1 && len(args) != 2 {
+				return failure("Usage: edit <filename> [jq]")
 			}
 
 			active := a.activePane()
-			_, cmd := a.runEditInner(active, args[0])
+			_, cmd := a.runEditInner(active, args[0], len(args) == 2 && args[1] == "jq")
 			return cmd
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)

@@ -94,7 +94,7 @@ rename <old> <new>
 view <file>
     View a file in read-only mode.
 
-edit <file>
+edit <file> [jq]
     Open a file in the default editor.
 
 copy (cp) <src> <dest>
