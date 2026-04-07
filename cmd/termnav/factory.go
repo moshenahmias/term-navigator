@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -13,8 +16,12 @@ import (
 	"github.com/moshenahmias/term-navigator/internal/backends/fakefs"
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	s3exp "github.com/moshenahmias/term-navigator/internal/backends/s3"
+	sftpexp "github.com/moshenahmias/term-navigator/internal/backends/sftp"
+
 	appcfg "github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -101,6 +108,53 @@ var (
 			}
 
 			return explorers, nil
+		},
+		"sftp": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
+			hostKeyCallback := ssh.InsecureIgnoreHostKey()
+
+			if !dev.InsecureSkipVerify && dev.CAFile != "" {
+				caData, err := os.ReadFile(dev.CAFile)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read CA file: %w", err)
+				}
+
+				trustedKey, _, _, _, err := ssh.ParseAuthorizedKey(caData)
+				if err != nil {
+					return nil, fmt.Errorf("invalid CA public key: %w", err)
+				}
+
+				hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+					if bytes.Equal(trustedKey.Marshal(), key.Marshal()) {
+						return nil
+					}
+					return fmt.Errorf("host key mismatch for %s", hostname)
+				}
+			}
+
+			cfg := &ssh.ClientConfig{
+				User: dev.Key,
+				Auth: []ssh.AuthMethod{
+					ssh.Password(dev.Secret),
+				},
+				HostKeyCallback: hostKeyCallback,
+			}
+
+			conn, err := ssh.Dial("tcp", dev.Endpoint, cfg)
+			if err != nil {
+				return nil, err
+			}
+			client, err := sftp.NewClient(conn)
+			if err != nil {
+				return nil, err
+			}
+
+			path := dev.Path
+
+			if path == "" {
+				path = "/"
+			}
+
+			return map[string]file.Explorer{dev.Name: sftpexp.NewExplorer(client, dev.Endpoint, path)}, nil
 		},
 	}
 )

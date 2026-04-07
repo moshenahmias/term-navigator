@@ -2,7 +2,7 @@
 
 ![screenshot](screenshot.png)
 
-A dual‑pane terminal file navigator for **local filesystems** and **S3‑compatible storage**.
+A dual‑pane terminal file navigator for **local filesystems**, **SFTP** and **S3‑compatible storage**.
 
 Navigate, view, edit, copy, move, delete, and inspect files across devices — all from a fast, keyboard‑driven TUI.
 
@@ -73,7 +73,8 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 Supported device types:
 
 - **local** — Local filesystem  
-- **s3** — AWS S3 or S3‑compatible (MinIO, Localstack, etc.)  
+- **s3** — AWS S3 or S3‑compatible (MinIO, Localstack, etc.) 
+- **sftp** — SSH File Transfer Protocol 
 - **fakefs** — In‑memory virtual filesystem (testing, demos)
 
 Device switching:
@@ -162,15 +163,21 @@ Example:
       "region": "us-east-1",
       "endpoint": "http://localhost:9000",
       "key": "minioadmin",
-      "secret": "minioadmin"
+      "secret": "minioadmin",
+      "insecure": true
     },
     {
-      "name": "demo",
-      "type": "fakefs"
+      "name": "sftp",
+      "type": "sftp",
+      "path": "/",
+      "key": "foo",
+      "secret": "pass",
+      "endpoint": "localhost:2222",
+      "insecure": true
     }
   ],
   "left": "local",
-  "right": "demo"
+  "right": "sftp"
 }
 ```
 
@@ -180,15 +187,15 @@ Example:
 |----------|-------------|---------|
 | name | Unique identifier | all |
 | type | local / s3 / fakefs | all |
-| path | Local filesystem path | local |
+| path | Local filesystem path | local, sftp |
 | bucket | S3 bucket name | s3 |
 | region | AWS region (optional) | s3 |
 | prefix | Prefix inside bucket | s3 |
-| key | Static access key | s3 |
-| secret | Static secret key | s3 |
-| endpoint | Custom S3 endpoint | s3 |
-| insecure | Skip TLS verification | s3 |
-| ca_file | Custom CA bundle | s3 |
+| key | Static access key | s3, sftp |
+| secret | Static secret key | s3, sftp |
+| endpoint | Custom S3 endpoint | s3, sftp |
+| insecure | Skip TLS verification | s3, sftp |
+| ca_file | Custom CA bundle | s3, sftp |
 | expected_cert_name | Override certificate hostname | s3 |
 
 

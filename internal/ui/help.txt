@@ -12,7 +12,7 @@
 ██║ ╚████║██║  ██║ ╚████╔╝ ██║╚██████╔╝██║  ██║   ██║   ╚██████╔╝██║  ██║
 ╚═╝  ╚═══╝╚═╝  ╚═╝  ╚═══╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-A dual-pane terminal file navigator for local filesystems
+A dual-pane terminal file navigator for local filesystems, SFTP
 and S3-compatible storage.
 Navigate, view, edit, copy, move, delete, and inspect files
 across devices.
@@ -52,6 +52,7 @@ Ctrl+E: Edit + format with jq
 Supported device types:
   local   - Local filesystem
   s3      - AWS S3 or S3-compatible (MinIO, Localstack, etc.)
+  sftp    - SSH File Transfer Protocol
   fakefs  - In-memory virtual filesystem (for testing, demos, sandboxing)
 
 Switching devices:
@@ -140,15 +141,21 @@ Example:
       "region": "us-east-1",
       "endpoint": "http://localhost:9000",
       "key": "minioadmin",
-      "secret": "minioadmin"
+      "secret": "minioadmin",
+      "insecure": true
     },
     {
-      "name": "demo",
-      "type": "fakefs"
+      "name": "sftp",
+      "type": "sftp",
+      "path": "/",
+      "key": "foo",
+      "secret": "pass",
+      "endpoint": "localhost:2222",
+      "insecure": true
     }
   ],
   "left": "local",
-  "right": "demo"
+  "right": "sftp"
 }
 
 +----------------------+-----------------------------------------------+--------------------------+
@@ -159,12 +166,12 @@ Example:
 | path                 | Local filesystem path                         | local                    |
 | buckets              | S3 bucket names (optional)                    | s3                       |
 | region               | AWS region (optional)                         | s3                       |
-| key                  | Static access key (optional)                  | s3                       |
-| secret               | Static secret key (optional)                  | s3                       |
+| key                  | Static access key (optional)                  | s3, sftp                 |
+| secret               | Static secret key (optional)                  | s3, sftp                 |
 | session              | Session token (optional)                      | s3                       |
-| endpoint             | Custom S3-compatible endpoint                 | s3                       |
-| insecure             | Skip TLS verification (dev only)              | s3                       |
-| ca_file              | Path to custom CA bundle                      | s3                       |
+| endpoint             | Custom S3-compatible endpoint                 | s3, sftp                 |
+| insecure             | Skip TLS verification (dev only)              | s3, sftp                 |
+| ca_file              | Path to custom CA bundle                      | s3, sftp                 |
 | expected_cert_name   | Override certificate hostname (SNI)           | s3                       |
 +----------------------+-----------------------------------------------+--------------------------+
 

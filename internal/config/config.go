@@ -23,18 +23,21 @@ type DeviceConfig struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 
-	// Local
+	// local, sftp
 	Path string `json:"path,omitempty"`
 
-	// S3
-	Buckets  []string `json:"buckets,omitempty"`
-	Region   string   `json:"region,omitempty"`
+	// s3, sftp
 	Key      string   `json:"key,omitempty"`
 	Secret   string   `json:"secret,omitempty"`
-	Session  string   `json:"session,omitempty"`
 	Endpoint string   `json:"endpoint,omitempty"`
 
-	// TLS
+
+	// s3
+	Buckets  []string `json:"buckets,omitempty"`
+	Region   string   `json:"region,omitempty"`
+	Session  string   `json:"session,omitempty"`
+
+	// TLS: s3, sftp
 	InsecureSkipVerify bool   `json:"insecure,omitempty"`
 	CAFile             string `json:"ca_file,omitempty"`
 	ExpectedCertName   string `json:"expected_cert_name,omitempty"`
