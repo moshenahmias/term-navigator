@@ -227,7 +227,7 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if total < 1 {
 						return fmt.Sprintf("Moved %s of %q", bytesFormatter(n), name)
 					}
-					return fmt.Sprintf("Moved %s/%s of %q", bytesFormatter(n), name)
+					return fmt.Sprintf("Moved %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyMove(ctx, a.textbox.Value(), progress)()
 				})
