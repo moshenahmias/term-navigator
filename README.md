@@ -145,6 +145,10 @@ batch <file>
 
 switch
     Switch to the other pane.
+
+copilot <prompt>
+    Generate and execute AI-assisted commands based on your prompt (requires copilot cli).
+
 ```
 
 
