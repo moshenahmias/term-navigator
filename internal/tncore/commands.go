@@ -1,13 +1,16 @@
-package ui
+package tncore
 
 import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
@@ -338,9 +341,77 @@ var (
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, filesOnlyItemSuggestionsFilter)
 		}},
+		"copilot": {f: func(a *App, args ...string) tea.Cmd {
+			if len(args) == 0 {
+				return func() tea.Msg {
+					return newErrorMsg("Usage: copilot <prompt>")
+				}
+			}
+
+			prompt := a.generateCopilotPrompt(strings.Join(args, " "))
+
+			cmd := func(ctx context.Context, _ file.ProgressFunc) func() tea.Msg {
+				return func() tea.Msg {
+					cmd := exec.CommandContext(ctx, "copilot", "-p", prompt)
+					cmd.SysProcAttr = &syscall.SysProcAttr{
+						Setpgid: true,
+					}
+
+					stop := context.AfterFunc(ctx, func() {
+						pgid, _ := syscall.Getpgid(cmd.Process.Pid)
+						syscall.Kill(-pgid, syscall.SIGKILL)
+
+					})
+
+					defer stop()
+
+					out, err := cmd.CombinedOutput()
+
+					if err != nil {
+						return newErrorMsg(string(out))
+					}
+
+					response := extractCopilotAnswer(string(out))
+
+					a.logger.Info("copilot response", slog.String("response", response))
+
+					batch := extractStringArray(response)
+
+					if len(batch) == 0 {
+						return status(response)()
+					}
+
+					return a.runBatchInner(batch...)()
+				}
+			}
+
+			a.runAsyncJob(func(name string, n, total int64) string {
+				panic("not gonna be called")
+			}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
+				return cmd(ctx, progress)()
+			})
+
+			return func() tea.Msg {
+				return statusMsg{text: "[ESC] Copilot is thinking...", d: 0}
+			}
+		}},
 	}
 	commandAlias = make(map[string]string)
 )
+
+func extractStringArray(input string) []string {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil
+	}
+
+	var arr []string
+	if err := json.Unmarshal([]byte(input), &arr); err != nil {
+		return nil
+	}
+
+	return arr
+}
 
 func init() {
 	for name, cmd := range commands {
@@ -437,10 +508,24 @@ func (a *App) runBatch(path string) tea.Cmd {
 
 	scanner := bufio.NewScanner(f)
 
-	var cmds []tea.Cmd
+	var lines []string
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		lines = append(lines, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return check(err)
+	}
+
+	return a.runBatchInner(lines...)
+}
+
+func (a *App) runBatchInner(lines ...string) tea.Cmd {
+	var cmds []tea.Cmd
+
+	for _, line := range lines {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue // skip empty lines and comments
 		}
@@ -473,10 +558,6 @@ func (a *App) runBatch(path string) tea.Cmd {
 
 			return c()
 		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		return check(err)
 	}
 
 	if len(cmds) > 0 {

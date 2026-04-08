@@ -1,4 +1,4 @@
-package ui
+package tncore
 
 import (
 	"fmt"
@@ -15,25 +15,43 @@ const (
 	defaultFastErrorDuration  = time.Second * 3
 )
 
-func splitStatusMsgLines(msg statusMsg) statusMsg {
+func wrapLine(line string, width int) []string {
+	if width <= 0 || len(line) <= width {
+		return []string{line}
+	}
+
+	var out []string
+	for len(line) > width {
+		out = append(out, line[:width])
+		line = line[width:]
+	}
+	if len(line) > 0 {
+		out = append(out, line)
+	}
+	return out
+}
+
+func splitStatusMsgLines(msg statusMsg, width int) statusMsg {
 	// Split into raw lines
 	raw := strings.Split(msg.text, "\n")
 
-	// Clean lines: trim spaces and discard empty ones
 	var lines []string
 	for _, line := range raw {
 		line = strings.TrimSpace(line)
-		if line != "" {
-			lines = append(lines, line)
+		if line == "" {
+			continue
 		}
+
+		// Wrap long lines
+		wrapped := wrapLine(line, width)
+		lines = append(lines, wrapped...)
 	}
 
-	// If no lines left, return a clear message
 	if len(lines) == 0 {
 		return statusMsg{}
 	}
 
-	// If only one line, return as-is but trimmed
+	// If only one line, return as-is
 	if len(lines) == 1 {
 		msg.text = lines[0]
 		return msg

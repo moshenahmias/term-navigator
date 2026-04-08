@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
-	"github.com/moshenahmias/term-navigator/internal/ui"
+	"github.com/moshenahmias/term-navigator/internal/tncore"
 )
 
 var Version = "dev"
@@ -94,7 +94,7 @@ func run(ctx context.Context) error {
 		return errors.New("no valid devices found in config")
 	}
 
-	app, err := ui.NewApp(ctx, devs, cfg.Left, cfg.Right, 120, 30)
+	app, err := tncore.NewApp(ctx, devs, cfg.Left, cfg.Right, 120, 30)
 
 	if err != nil {
 		return errors.New("failed to create app: " + err.Error())
@@ -110,7 +110,7 @@ func run(ctx context.Context) error {
 	if len(errs) > 0 {
 		go func() {
 			defer close(done)
-			app.Send(ui.NewLongErrorMsgFromErrors(errs...))
+			app.Send(tncore.NewLongErrorMsgFromErrors(errs...))
 		}()
 	}
 

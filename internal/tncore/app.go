@@ -1,4 +1,4 @@
-package ui
+package tncore
 
 import (
 	"context"
@@ -271,10 +271,10 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case statusMsg:
-		msg = splitStatusMsgLines(msg)
+		msg = splitStatusMsgLines(msg, a.width)
 		a.msg = msg
 
-		if msg.d <= 0 || msg.text == "" {
+		if msg.text == "" {
 			return a, nil
 		}
 
@@ -282,6 +282,10 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.logger.Error(msg.text)
 		} else {
 			a.logger.Info(msg.text)
+		}
+
+		if msg.d <= 0 {
+			return a, nil
 		}
 
 		return a, tea.Tick(msg.d, func(time.Time) tea.Msg {
