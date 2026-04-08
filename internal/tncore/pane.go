@@ -346,28 +346,6 @@ func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
 	return p, cmd
 }
 
-func truncateLeft(s string, width int) string {
-	r := []rune(s)
-	if len(r) <= width {
-		return s
-	}
-	if width <= 1 {
-		return "…"
-	}
-	return " " + string(r[len(r)-width+1:])
-}
-
-func truncate(s string, width int) string {
-	r := []rune(s)
-	if len(r) <= width {
-		return s
-	}
-	if width <= 1 {
-		return "…"
-	}
-	return string(r[:width-1]) + "…"
-}
-
 func (p *Pane) View() string {
 	cwd := " " + p.name + " " + p.explorer.PrintableCwd(p.ctx)
 	cwd = truncateLeft(cwd, p.width-3) // account for borders

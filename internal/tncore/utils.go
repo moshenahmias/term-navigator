@@ -75,3 +75,25 @@ func listZip(path string) (string, error) {
 	}
 	return sb.String(), nil
 }
+
+func truncateLeft(s string, width int) string {
+	r := []rune(s)
+	if len(r) <= width {
+		return s
+	}
+	if width <= 1 {
+		return "…"
+	}
+	return " " + string(r[len(r)-width+1:])
+}
+
+func truncate(s string, width int) string {
+	r := []rune(s)
+	if len(r) <= width {
+		return s
+	}
+	if width <= 1 {
+		return "…"
+	}
+	return string(r[:width-1]) + "…"
+}
