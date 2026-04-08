@@ -57,7 +57,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | F1 | Help |
 | F2 | Rename selected item |
 | F3 | View file |
-| F4 | Edit file or extract archive |
+| F4 | Edit file or extract archive (Use Ctrl+E for edit + json beautify using jq) |
 | F5 | Copy item to opposite pane |
 | F6 | Move item to opposite pane |
 | F7 | Create directory |
@@ -65,7 +65,9 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | F9 | Show metadata |
 | F10 | Change device for active pane |
 | F12 | Swap left/right devices |
+| / | Filter |
 | ESC | Quit |
+
 
 
 ## 3. 💽 Devices

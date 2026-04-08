@@ -11,38 +11,44 @@ import (
 const (
 	defaultFastStatusDuration = time.Second / 2
 	defaultStatusDuration     = time.Second * 5
-	defaultErrorDuration      = time.Second * 10
+	defaultErrorDuration      = time.Second * 5
 	defaultFastErrorDuration  = time.Second * 3
 )
 
 func wrapLine(line string, width int) []string {
-	if width <= 0 || len(line) <= width {
+	r := []rune(line)
+
+	if width <= 0 || len(r) <= width {
 		return []string{line}
 	}
 
 	var out []string
-	for len(line) > width {
-		out = append(out, line[:width])
-		line = line[width:]
+	for len(r) > width {
+		out = append(out, string(r[:width]))
+		r = r[width:]
 	}
-	if len(line) > 0 {
-		out = append(out, line)
+	if len(r) > 0 {
+		out = append(out, string(r))
 	}
 	return out
 }
 
 func splitStatusMsgLines(msg statusMsg, width int) statusMsg {
-	// Split into raw lines
 	raw := strings.Split(msg.text, "\n")
 
 	var lines []string
 	for _, line := range raw {
-		line = strings.TrimSpace(line)
+		// Preserve leading/trailing whitespace
+		// Only trim *right-side* whitespace to avoid accidental overflow
+		line = strings.TrimRight(line, " \t")
+
+		// Keep empty lines — they matter for formatting
 		if line == "" {
+			lines = append(lines, "")
 			continue
 		}
 
-		// Wrap long lines
+		// Wrap long lines using Unicode-safe wrapLine
 		wrapped := wrapLine(line, width)
 		lines = append(lines, wrapped...)
 	}
@@ -51,7 +57,7 @@ func splitStatusMsgLines(msg statusMsg, width int) statusMsg {
 		return statusMsg{}
 	}
 
-	// If only one line, return as-is
+	// Single-line fast path
 	if len(lines) == 1 {
 		msg.text = lines[0]
 		return msg
@@ -78,7 +84,16 @@ func splitStatusMsgLines(msg statusMsg, width int) statusMsg {
 }
 
 func newLongStatusOrErrorMsg(isErr bool, lines ...string) tea.Msg {
-	if len(lines) == 0 {
+	filtered := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			filtered = append(filtered, line)
+		}
+	}
+
+	if len(filtered) == 0 {
 		return clearStatusMsg{}
 	}
 
@@ -88,11 +103,11 @@ func newLongStatusOrErrorMsg(isErr bool, lines ...string) tea.Msg {
 		d = defaultFastErrorDuration
 	}
 
-	msg := statusMsg{text: lines[0], isErr: isErr, d: d}
+	msg := statusMsg{text: filtered[0], isErr: isErr, d: d}
 
 	p := &msg
 
-	for _, s := range lines[1:] {
+	for _, s := range filtered[1:] {
 		p.next = &statusMsg{text: s, isErr: isErr, d: d}
 		p = p.next
 	}

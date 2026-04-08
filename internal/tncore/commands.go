@@ -367,19 +367,19 @@ var (
 
 					out, err := cmd.CombinedOutput()
 
-					if err != nil {
-						return newErrorMsg(string(out))
-					}
-
 					response := extractCopilotAnswer(string(out))
 
-					a.logger.Info("copilot response", slog.String("response", response))
+					if err != nil {
+						return NewLongErrorMsg(response, err.Error())
+					}
 
 					batch := extractStringArray(response)
 
 					if len(batch) == 0 {
 						return status(response)()
 					}
+
+					a.logger.Info("copilot response", slog.String("response", response))
 
 					return a.runBatchInner(batch...)()
 				}
