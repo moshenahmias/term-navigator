@@ -70,6 +70,7 @@ func (a *App) generateCopilotPrompt(input string) string {
 	sb.WriteString("switch                          - switch which pane is active\n")
 	sb.WriteString("cd <folder name>                - change directory inside the active pane\n")
 
+	sb.WriteString("In all commands, when you refer to a folder, use / at the end\n")
 	sb.WriteString("I will now ask you something. Based on all the information above, respond ONLY with valid commands.\n")
 	sb.WriteString("If you need to refer to an item inside a folder, you MUST cd into that folder first. Commands operate ONLY on the current directories of both panes. Full paths are NOT allowed.\n")
 	sb.WriteString("Your answer MUST be EXACTLY in this format, with no extra text: [\"cmd...\", \"cmd...\", ...]\n")

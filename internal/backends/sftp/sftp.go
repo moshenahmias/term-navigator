@@ -75,14 +75,16 @@ func (e *explorer) Join(dir, name string) string {
 	return filepath.Join(dir, name)
 }
 
-func (e *explorer) Chdir(ctx context.Context, p string) error {
-	var abs string
-	if filepath.IsAbs(p) {
-		abs = p
-	} else {
-		abs = filepath.Join(e.cwd, p)
+func (e *explorer) Abs(path string) string {
+	if filepath.IsAbs(path) {
+		return path
 	}
 
+	return filepath.Join(e.cwd, path)
+}
+
+func (e *explorer) Chdir(ctx context.Context, p string) error {
+	abs := e.Abs(p)
 	st, err := e.client.Stat(abs)
 	if err != nil {
 		return err
@@ -134,12 +136,7 @@ func (e *explorer) List(ctx context.Context) ([]file.Info, error) {
 }
 
 func (e *explorer) Stat(ctx context.Context, p string) (file.Info, error) {
-	var abs string
-	if filepath.IsAbs(p) {
-		abs = p
-	} else {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 
 	fi, err := e.client.Stat(abs)
 	if err != nil {
@@ -176,18 +173,12 @@ func (e *explorer) Exists(ctx context.Context, p string) bool {
 }
 
 func (e *explorer) Read(ctx context.Context, p string) (io.ReadCloser, error) {
-	abs := p
-	if !filepath.IsAbs(p) {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 	return e.client.Open(abs)
 }
 
 func (e *explorer) Write(ctx context.Context, p string, r io.Reader) error {
-	abs := p
-	if !filepath.IsAbs(p) {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 
 	// Ensure parent exists
 	if err := e.client.MkdirAll(filepath.Dir(abs)); err != nil {
@@ -205,10 +196,7 @@ func (e *explorer) Write(ctx context.Context, p string, r io.Reader) error {
 }
 
 func (e *explorer) Delete(ctx context.Context, p string) error {
-	abs := p
-	if !filepath.IsAbs(p) {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 
 	fi, err := e.client.Stat(abs)
 	if err != nil {
@@ -222,10 +210,7 @@ func (e *explorer) Delete(ctx context.Context, p string) error {
 }
 
 func (e *explorer) Mkdir(ctx context.Context, p string) error {
-	abs := p
-	if !filepath.IsAbs(p) {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 	return e.client.MkdirAll(abs)
 }
 
@@ -246,10 +231,7 @@ func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 
 func (e *explorer) Download(ctx context.Context, p string, progress file.ProgressFunc) (file.Temp, error) {
 	// SFTP: just read the file into a temp
-	abs := p
-	if !filepath.IsAbs(p) {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 
 	rc, err := e.client.Open(abs)
 	if err != nil {
@@ -370,10 +352,7 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 }
 
 func (e *explorer) Metadata(ctx context.Context, p string) (map[string]string, error) {
-	abs := p
-	if !filepath.IsAbs(p) {
-		abs = filepath.Join(e.cwd, p)
-	}
+	abs := e.Abs(p)
 
 	fi, err := e.client.Stat(abs)
 	if err != nil {

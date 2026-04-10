@@ -47,4 +47,5 @@ type Explorer interface {
 	Download(ctx context.Context, path string, progress ProgressFunc) (Temp, error)
 	UploadFrom(ctx context.Context, localPath, destPath string, progress ProgressFunc) error
 	Metadata(ctx context.Context, path string) (map[string]string, error)
+	Abs(path string) string
 }

@@ -149,12 +149,12 @@ func (e *explorer) Join(dir, name string) string {
 func (e *explorer) Chdir(ctx context.Context, p string) error {
 	var prefix string
 
-	// If p is "" or ends with "/", treat it as an absolute prefix
+	// If p is "" or ends with "/", treat it as an Absolute prefix
 	if p == "" || strings.HasSuffix(p, "/") {
 		prefix = p
 	} else {
 		// Otherwise treat it as a relative path
-		prefix = e.abs(p)
+		prefix = strings.TrimLeft(e.Abs(p), "/")
 	}
 
 	// Normalize: ensure directories end with "/"
@@ -229,7 +229,7 @@ func (e *explorer) List(ctx context.Context) ([]file.Info, error) {
 }
 
 func (e *explorer) Stat(ctx context.Context, p string) (file.Info, error) {
-	key := e.abs(p)
+	key := strings.TrimLeft(e.Abs(p), "/")
 
 	// Try as file
 	head, err := e.client.HeadObject(ctx, &s3.HeadObjectInput{
@@ -291,7 +291,8 @@ func (e *explorer) Exists(ctx context.Context, p string) bool {
 }
 
 func (e *explorer) Read(ctx context.Context, p string) (io.ReadCloser, error) {
-	key := e.abs(p)
+	key := strings.TrimLeft(e.Abs(p), "/")
+
 	out, err := e.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(e.bucket),
 		Key:    aws.String(key),
@@ -303,7 +304,8 @@ func (e *explorer) Read(ctx context.Context, p string) (io.ReadCloser, error) {
 }
 
 func (e *explorer) Write(ctx context.Context, p string, r io.Reader) error {
-	key := e.abs(p)
+	key := strings.TrimLeft(e.Abs(p), "/")
+
 	_, err := e.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(e.bucket),
 		Key:    aws.String(key),
@@ -313,7 +315,7 @@ func (e *explorer) Write(ctx context.Context, p string, r io.Reader) error {
 }
 
 func (e *explorer) Delete(ctx context.Context, p string) error {
-	key := e.abs(p)
+	key := strings.TrimLeft(e.Abs(p), "/")
 
 	// Directory: delete all under prefix
 	if strings.HasSuffix(key, "/") {
@@ -328,7 +330,8 @@ func (e *explorer) Delete(ctx context.Context, p string) error {
 }
 
 func (e *explorer) Mkdir(ctx context.Context, p string) error {
-	key := e.abs(p)
+	key := strings.TrimLeft(e.Abs(p), "/")
+
 	if !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
@@ -341,8 +344,8 @@ func (e *explorer) Mkdir(ctx context.Context, p string) error {
 }
 
 func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
-	src := e.abs(oldPath)
-	dst := e.abs(newPath)
+	src := strings.TrimLeft(e.Abs(oldPath), "/")
+	dst := strings.TrimLeft(e.Abs(newPath), "/")
 
 	// If it's a "directory", we need to copy all keys under the prefix
 	if strings.HasSuffix(src, "/") {
@@ -523,7 +526,7 @@ func (e *explorer) downloadObject(ctx context.Context, key, p string, progress f
 }
 
 func (e *explorer) Download(ctx context.Context, p string, progress file.ProgressFunc) (file.Temp, error) {
-	key := e.abs(p)
+	key := strings.TrimLeft(e.Abs(p), "/")
 
 	if !strings.HasSuffix(p, "/") {
 		// It's a real object → download normally
@@ -560,7 +563,7 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 				return err
 			}
 
-			targetKey := e.abs(path.Join(destPath, filepath.ToSlash(rel)))
+			targetKey := strings.TrimLeft(e.Abs(path.Join(destPath, filepath.ToSlash(rel))), "/")
 
 			if fi.IsDir() {
 				if !strings.HasSuffix(targetKey, "/") {
@@ -612,7 +615,8 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 		})
 	}
 
-	key := e.abs(destPath)
+	key := strings.TrimLeft(e.Abs(destPath), "/")
+
 	_, err = e.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(e.bucket),
 		Key:    aws.String(key),
@@ -621,9 +625,8 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	return err
 }
 
-func (e *explorer) abs(key string) string {
-	// Already absolute
-	if strings.HasPrefix(key, e.cwd) {
+func (e *explorer) Abs(key string) string {
+	if strings.HasPrefix(key, "/") {
 		return key
 	}
 
@@ -633,7 +636,7 @@ func (e *explorer) abs(key string) string {
 		cwd += "/"
 	}
 
-	return cwd + key
+	return "/" + cwd + key
 }
 
 func (e *explorer) deletePrefix(ctx context.Context, prefix string) error {

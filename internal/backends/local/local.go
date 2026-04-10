@@ -70,10 +70,7 @@ func (e *explorer) Join(dir, name string) string {
 }
 
 func (l *explorer) Chdir(ctx context.Context, path string) error {
-	abs := path
-	if !filepath.IsAbs(path) {
-		abs = l.Join(l.cwd, path)
-	}
+	abs := l.Abs(path)
 
 	info, err := os.Stat(abs)
 	if err != nil {
@@ -131,10 +128,7 @@ func (l *explorer) List(ctx context.Context) ([]file.Info, error) {
 }
 
 func (l *explorer) Stat(ctx context.Context, path string) (file.Info, error) {
-	abs := path
-	if !filepath.IsAbs(path) {
-		abs = l.Join(l.cwd, path)
-	}
+	abs := l.Abs(path)
 
 	fi, err := os.Stat(abs)
 	if err != nil {
@@ -168,18 +162,12 @@ func (l *explorer) Exists(ctx context.Context, path string) bool {
 }
 
 func (l *explorer) Read(_ context.Context, path string) (io.ReadCloser, error) {
-	abs := path
-	if !filepath.IsAbs(path) {
-		abs = filepath.Join(l.cwd, path)
-	}
+	abs := l.Abs(path)
 	return os.Open(abs)
 }
 
 func (l *explorer) Write(ctx context.Context, path string, r io.Reader) error {
-	abs := path
-	if !filepath.IsAbs(path) {
-		abs = l.Join(l.cwd, path)
-	}
+	abs := l.Abs(path)
 
 	// Ensure parent directory exists
 	if err := os.MkdirAll(l.Dir(abs), 0755); err != nil {
@@ -197,32 +185,18 @@ func (l *explorer) Write(ctx context.Context, path string, r io.Reader) error {
 }
 
 func (l *explorer) Delete(ctx context.Context, path string) error {
-	abs := path
-	if !filepath.IsAbs(path) {
-		abs = l.Join(l.cwd, path)
-	}
+	abs := l.Abs(path)
 	return os.RemoveAll(abs)
 }
 
 func (l *explorer) Mkdir(ctx context.Context, path string) error {
-	abs := path
-	if !filepath.IsAbs(path) {
-		abs = l.Join(l.cwd, path)
-	}
+	abs := l.Abs(path)
 	return os.MkdirAll(abs, 0755)
 }
 
 func (l *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
-	absOld := oldPath
-	if !filepath.IsAbs(oldPath) {
-		absOld = l.Join(l.cwd, oldPath)
-	}
-
-	absNew := newPath
-	if !filepath.IsAbs(newPath) {
-		absNew = l.Join(l.cwd, newPath)
-	}
-
+	absOld := l.Abs(oldPath)
+	absNew := l.Abs(newPath)
 	return os.Rename(absOld, absNew)
 }
 
@@ -238,6 +212,9 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	if localPath == "" || destPath == "" {
 		return errors.New("invalid path")
 	}
+
+	localPath = l.Abs(localPath)
+	destPath = l.Abs(destPath)
 
 	// No-op if source and destination are identical
 	if localPath == destPath {
@@ -348,6 +325,8 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 }
 
 func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {
+	path = l.Abs(path)
+
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -387,4 +366,12 @@ func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string
 	}
 
 	return meta, nil
+}
+
+func (l *explorer) Abs(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+
+	return l.Join(l.cwd, path)
 }

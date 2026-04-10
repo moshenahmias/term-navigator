@@ -108,15 +108,13 @@ var (
 
 			src, dst := a.panes()
 
-			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
-
 			a.runAsyncJob(func(name string, n, total int64) string {
 				if total < 1 {
 					return fmt.Sprintf("Copied %s of %q", bytesFormatter(n), name)
 				}
 				return fmt.Sprintf("Copied %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
 			}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
-				return a.applyCopyInner(a.ctx, src, dst, from, args[1], progress)()
+				return a.applyCopyInner(a.ctx, src, dst, args[0], args[1], progress)()
 			})
 
 			return nil
@@ -130,15 +128,13 @@ var (
 
 			src, dst := a.panes()
 
-			from := src.explorer.Join(src.explorer.Cwd(a.ctx), args[0])
-
 			a.runAsyncJob(func(name string, n, total int64) string {
 				if total < 1 {
 					return fmt.Sprintf("Moved %s of %q", bytesFormatter(n), name)
 				}
 				return fmt.Sprintf("Moved %s/%s of %q", bytesFormatter(n), bytesFormatter(total), name)
 			}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
-				return a.applyMoveInner(ctx, src, dst, from, args[1], progress)()
+				return a.applyMoveInner(ctx, src, dst, args[0], args[1], progress)()
 			})
 
 			return nil

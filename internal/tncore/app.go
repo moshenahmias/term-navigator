@@ -8,7 +8,6 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"path"
 	"runtime"
 	"slices"
 	"sort"
@@ -704,16 +703,14 @@ func (a *App) applyRename(text string) tea.Cmd {
 		return nil
 	}
 
-	oldPath := fi.Info.FullPath
-
-	return a.applyRenameInner(pane, oldPath, text)
+	return a.applyRenameInner(pane, fi.Info.FullPath, text)
 }
 
 func (a *App) applyRenameInner(pane *Pane, oldPath, name string) tea.Cmd {
 	exp := pane.explorer
 
 	// Compute new path/key
-	newPath := exp.Join(exp.Dir(oldPath), name)
+	newPath := exp.Abs(name)
 
 	// Perform backend rename
 	if err := exp.Rename(a.ctx, oldPath, newPath); err != nil {
@@ -740,13 +737,16 @@ func (a *App) applyCopy(ctx context.Context, text string, progress file.Progress
 		return failure("confirmation text does not match")
 	}
 
+	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
+		return check(nil)
+	}
+
 	return a.applyCopyInner(ctx, src, dst, item.Info.FullPath, item.Info.Name, progress)
 }
 
-func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
-	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
-		return nil
-	}
+func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, to string, progress file.ProgressFunc) tea.Cmd {
+	from = src.explorer.Abs(from)
+	to = dst.explorer.Abs(to)
 
 	return func() tea.Msg {
 		// 1. Download from source backend
@@ -758,12 +758,11 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 		// We will collect ALL errors here
 		var errs []string
 
-		name = handle.Dest(name)
+		to = handle.Dest(to)
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(ctx), name)
 
-		if err := dst.explorer.UploadFrom(ctx, handle.Path(), dstPath, progress); err != nil {
+		if err := dst.explorer.UploadFrom(ctx, handle.Path(), to, progress); err != nil {
 			errs = append(errs, "Copy failed: "+err.Error())
 		}
 
@@ -779,7 +778,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, name str
 		if len(errs) > 0 {
 			return NewLongErrorMsg(errs...)
 		}
-		return newStatusMsg(fmt.Sprintf("Copied %q to %q", from, dstPath))
+		return newStatusMsg(fmt.Sprintf("Copied %q to %q", from, to))
 	}
 }
 func (a *App) applyMove(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
@@ -794,13 +793,16 @@ func (a *App) applyMove(ctx context.Context, text string, progress file.Progress
 		return failure("confirmation text does not match")
 	}
 
+	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
+		return check(nil)
+	}
+
 	return a.applyMoveInner(ctx, src, dst, item.Info.FullPath, item.Info.Name, progress)
 }
 
-func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name string, progress file.ProgressFunc) tea.Cmd {
-	if src.explorer.DeviceID(ctx) == dst.explorer.DeviceID(ctx) && src.explorer.Cwd(ctx) == dst.explorer.Cwd(ctx) {
-		return nil
-	}
+func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, to string, progress file.ProgressFunc) tea.Cmd {
+	from = src.explorer.Abs(from)
+	to = dst.explorer.Abs(to)
 
 	return func() tea.Msg {
 		// 1. Download from source backend
@@ -812,11 +814,10 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 		// We will collect ALL errors here
 		var errs []string
 
-		name = handle.Dest(name)
+		to = handle.Dest(to)
 
 		// 2. Upload to destination backend
-		dstPath := path.Join(dst.explorer.Cwd(ctx), name)
-		if err := dst.explorer.UploadFrom(ctx, handle.Path(), dstPath, progress); err != nil {
+		if err := dst.explorer.UploadFrom(ctx, handle.Path(), to, progress); err != nil {
 			errs = append(errs, "Move failed: "+err.Error())
 		}
 
@@ -841,13 +842,13 @@ func (a *App) applyMoveInner(ctx context.Context, src, dst *Pane, from, name str
 			return NewLongErrorMsg(errs...)
 		}
 
-		return newStatusMsg(fmt.Sprintf("Moved %q to %q", from, dstPath))
+		return newStatusMsg(fmt.Sprintf("Moved %q to %q", from, to))
 	}
 }
 
 func (a *App) applyMakeDir(text string) tea.Cmd {
 	active := a.activePane()
-	newDirPath := path.Join(active.explorer.Cwd(a.ctx), text)
+	newDirPath := active.explorer.Abs(text)
 
 	if err := active.explorer.Mkdir(a.ctx, newDirPath); err != nil {
 		return check(err)

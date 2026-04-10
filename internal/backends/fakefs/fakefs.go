@@ -70,59 +70,59 @@ func (t temp) Close() error { return nil }
 // ────────────────────────────────────────────────────────────────
 //
 
-type Explorer struct {
+type explorer struct {
 	mu   sync.RWMutex
 	cwd  string
 	root *node
 }
 
-var _ file.Explorer = (*Explorer)(nil)
+var _ file.Explorer = (*explorer)(nil)
 
-func NewExplorer() *Explorer {
-	return &Explorer{
+func NewExplorer() *explorer {
+	return &explorer{
 		cwd:  "/",
 		root: newDir("/"),
 	}
 }
 
-func (e *Explorer) Copy() file.Explorer {
+func (e *explorer) Copy() file.Explorer {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return &Explorer{
+	return &explorer{
 		// fresh zero-value mutex
 		cwd:  e.cwd,
 		root: e.root, // share the same tree
 	}
 }
 
-func (e *Explorer) Type() string { return "fakefs" }
+func (e *explorer) Type() string { return "fakefs" }
 
-func (e *Explorer) DeviceID(context.Context) string { return e.Type() }
+func (e *explorer) DeviceID(context.Context) string { return e.Type() }
 
-func (e *Explorer) Cwd(context.Context) string {
+func (e *explorer) Cwd(context.Context) string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.cwd
 }
 
-func (e *Explorer) PrintableCwd(ctx context.Context) string {
+func (e *explorer) PrintableCwd(ctx context.Context) string {
 	return e.Cwd(ctx)
 }
 
-func (e *Explorer) IsRoot(ctx context.Context) bool {
+func (e *explorer) IsRoot(ctx context.Context) bool {
 	return e.Cwd(ctx) == "/"
 }
 
-func (e *Explorer) Parent(ctx context.Context) (string, bool) {
+func (e *explorer) Parent(ctx context.Context) (string, bool) {
 	if e.IsRoot(ctx) {
 		return "", false
 	}
 	return path.Dir(e.Cwd(ctx)), true
 }
 
-func (e *Explorer) Dir(p string) string     { return path.Dir(p) }
-func (e *Explorer) Join(a, b string) string { return path.Join(a, b) }
+func (e *explorer) Dir(p string) string     { return path.Dir(p) }
+func (e *explorer) Join(a, b string) string { return path.Join(a, b) }
 
 func clean(p string) string {
 	if p == "" {
@@ -135,7 +135,7 @@ func clean(p string) string {
 	return c
 }
 
-func (e *Explorer) absPath(p string) string {
+func (e *explorer) Abs(p string) string {
 	if path.IsAbs(p) {
 		return clean(p)
 	}
@@ -148,7 +148,7 @@ func (e *Explorer) absPath(p string) string {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) lookupUnlocked(p string) (*node, error) {
+func (e *explorer) lookupUnlocked(p string) (*node, error) {
 	if p == "/" {
 		return e.root, nil
 	}
@@ -169,7 +169,7 @@ func (e *Explorer) lookupUnlocked(p string) (*node, error) {
 	return cur, nil
 }
 
-func (e *Explorer) ensureParentUnlocked(p string) (*node, string, error) {
+func (e *explorer) ensureParentUnlocked(p string) (*node, string, error) {
 	dir := path.Dir(p)
 	base := path.Base(p)
 
@@ -189,11 +189,11 @@ func (e *Explorer) ensureParentUnlocked(p string) (*node, string, error) {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Chdir(ctx context.Context, p string) error {
+func (e *explorer) Chdir(ctx context.Context, p string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	n, err := e.lookupUnlocked(abs)
 	if err != nil {
 		return err
@@ -212,7 +212,7 @@ func (e *Explorer) Chdir(ctx context.Context, p string) error {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) List(ctx context.Context) ([]file.Info, error) {
+func (e *explorer) List(ctx context.Context) ([]file.Info, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -244,11 +244,11 @@ func (e *Explorer) List(ctx context.Context) ([]file.Info, error) {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Stat(ctx context.Context, p string) (file.Info, error) {
+func (e *explorer) Stat(ctx context.Context, p string) (file.Info, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	n, err := e.lookupUnlocked(abs)
 	if err != nil {
 		return file.Info{}, err
@@ -264,7 +264,7 @@ func (e *Explorer) Stat(ctx context.Context, p string) (file.Info, error) {
 	}, nil
 }
 
-func (e *Explorer) Exists(ctx context.Context, p string) bool {
+func (e *explorer) Exists(ctx context.Context, p string) bool {
 	_, err := e.Stat(ctx, p)
 	return err == nil
 }
@@ -275,11 +275,11 @@ func (e *Explorer) Exists(ctx context.Context, p string) bool {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Read(ctx context.Context, p string) (io.ReadCloser, error) {
+func (e *explorer) Read(ctx context.Context, p string) (io.ReadCloser, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	n, err := e.lookupUnlocked(abs)
 	if err != nil {
 		return nil, err
@@ -297,11 +297,11 @@ func (e *Explorer) Read(ctx context.Context, p string) (io.ReadCloser, error) {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Write(ctx context.Context, p string, r io.Reader) error {
+func (e *explorer) Write(ctx context.Context, p string, r io.Reader) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	parent, base, err := e.ensureParentUnlocked(abs)
 	if err != nil {
 		return err
@@ -322,11 +322,11 @@ func (e *Explorer) Write(ctx context.Context, p string, r io.Reader) error {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Delete(ctx context.Context, p string) error {
+func (e *explorer) Delete(ctx context.Context, p string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	if abs == "/" {
 		return errors.New("cannot delete root")
 	}
@@ -346,11 +346,11 @@ func (e *Explorer) Delete(ctx context.Context, p string) error {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Mkdir(ctx context.Context, p string) error {
+func (e *explorer) Mkdir(ctx context.Context, p string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	parent, base, err := e.ensureParentUnlocked(abs)
 	if err != nil {
 		return err
@@ -370,12 +370,12 @@ func (e *Explorer) Mkdir(ctx context.Context, p string) error {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Rename(ctx context.Context, oldPath, newPath string) error {
+func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	oldAbs := e.absPath(oldPath)
-	newAbs := e.absPath(newPath)
+	oldAbs := e.Abs(oldPath)
+	newAbs := e.Abs(newPath)
 
 	oldParent, oldBase, err := e.ensureParentUnlocked(oldAbs)
 	if err != nil {
@@ -405,11 +405,11 @@ func (e *Explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Download(ctx context.Context, p string, progress file.ProgressFunc) (file.Temp, error) {
+func (e *explorer) Download(ctx context.Context, p string, progress file.ProgressFunc) (file.Temp, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	n, err := e.lookupUnlocked(abs)
 	if err != nil {
 		return nil, err
@@ -454,7 +454,7 @@ func (e *Explorer) Download(ctx context.Context, p string, progress file.Progres
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) UploadFrom(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
+func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
 	info, err := os.Lstat(localPath)
 	if err != nil {
 		return err
@@ -469,7 +469,7 @@ func (e *Explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	})
 }
 
-func (e *Explorer) uploadFile(ctx context.Context, localPath, destPath string, progress file.TotalReadFunc) error {
+func (e *explorer) uploadFile(ctx context.Context, localPath, destPath string, progress file.TotalReadFunc) error {
 	f, err := os.Open(localPath)
 	if err != nil {
 		return err
@@ -485,7 +485,7 @@ func (e *Explorer) uploadFile(ctx context.Context, localPath, destPath string, p
 	return e.Write(ctx, destPath, pr)
 }
 
-func (e *Explorer) uploadDir(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
+func (e *explorer) uploadDir(ctx context.Context, localPath, destPath string, progress file.ProgressFunc) error {
 	return filepathWalk(localPath, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -544,11 +544,11 @@ func filepathWalk(root string, fn func(string, os.FileInfo, error) error) error 
 // ────────────────────────────────────────────────────────────────
 //
 
-func (e *Explorer) Metadata(ctx context.Context, p string) (map[string]string, error) {
+func (e *explorer) Metadata(ctx context.Context, p string) (map[string]string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	abs := e.absPath(p)
+	abs := e.Abs(p)
 	n, err := e.lookupUnlocked(abs)
 	if err != nil {
 		return nil, err
