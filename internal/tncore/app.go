@@ -52,6 +52,10 @@ type progressMsg struct {
 	text string
 }
 
+type batchMsg struct {
+	lines []string
+}
+
 type inputMode int
 
 const (
@@ -63,15 +67,19 @@ const (
 	inputConfirmMove
 	inputChangeDevice
 	inputCommand
+	inputConfirmBatch
 )
 
 const (
 	deleteConfirmationText = "DELETE"
 	copyConfirmationText   = "COPY"
 	moveConfirmationText   = "MOVE"
+	batchConfirmationText  = "RUN"
 	fileViewEditMaxSize    = 1024 * 1024 * 4 // 4 MB
 	maxLogHistory          = 300
 )
+
+var toBatch []string
 
 var _, jqErr = exec.LookPath("jq")
 
@@ -90,6 +98,7 @@ var inputText = map[inputMode]string{
 		}
 		return "ALT"
 	}()),
+	inputConfirmBatch: fmt.Sprintf("Type %s to confirm:", batchConfirmationText),
 }
 
 var _ tea.Model = (*App)(nil)
@@ -203,11 +212,17 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch currentInput {
 			case inputRename:
-				return a, a.applyRename(a.textbox.Value())
+				if cmd := a.applyRename(a.textbox.Value()); cmd != nil {
+					return a, cmd
+				}
 			case inputMkdir:
-				return a, a.applyMakeDir(a.textbox.Value())
+				if cmd := a.applyMakeDir(a.textbox.Value()); cmd != nil {
+					return a, cmd
+				}
 			case inputConfirmDelete:
-				return a, a.applyDelete(a.textbox.Value())
+				if cmd := a.applyDelete(a.textbox.Value()); cmd != nil {
+					return a, cmd
+				}
 			case inputConfirmCopy:
 				a.runAsyncJob(func(name string, n, total int64) string {
 					if total < 1 {
@@ -219,8 +234,6 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return a.applyCopy(ctx, a.textbox.Value(), progress)()
 				})
 
-				return a, nil
-
 			case inputConfirmMove:
 				a.runAsyncJob(func(name string, n, total int64) string {
 					if total < 1 {
@@ -230,22 +243,27 @@ func (a *App) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 					return a.applyMove(ctx, a.textbox.Value(), progress)()
 				})
-
-				return a, nil
 			case inputChangeDevice:
-				return a, a.applyChangeDevice(a.textbox.Value())
+				if cmd := a.applyChangeDevice(a.textbox.Value()); cmd != nil {
+					return a, cmd
+				}
 			case inputCommand:
-				return a, a.applyCommand(a.textbox.Value())
+				if cmd := a.applyCommand(a.textbox.Value()); cmd != nil {
+					return a, cmd
+				}
+			case inputConfirmBatch:
+				if a.textbox.Value() != batchConfirmationText {
+					return a, failure("aborted")
+				}
+				if cmd := a.applyBatch(); cmd != nil {
+					return a, cmd
+				}
 			}
-
-			return a, nil
 
 		case "esc":
 			a.inputMode = inputNone
-			return a, nil
 		default:
 			a.setLiveSuggestions(a.textbox.Value())
-			return a, nil
 		}
 	}
 
@@ -263,6 +281,19 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	active := a.activePane() // left or right
 
 	switch msg := msg.(type) {
+
+	case batchMsg:
+		if len(msg.lines) > 0 {
+			toBatch = msg.lines
+			a.inputMode = inputConfirmBatch
+			a.textbox.SetValue("")
+			a.textbox.Placeholder = batchConfirmationText
+			a.textbox.SetSuggestions([]string{batchConfirmationText})
+			a.textbox.Focus()
+		} else {
+			toBatch = nil
+		}
+		return a, nil
 
 	case progressMsg:
 		msg.text = strings.NewReplacer("\n", "", "\r", "").Replace(msg.text)
@@ -374,7 +405,6 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-				//return a, nil
 			}
 
 		case "f1": // Help
