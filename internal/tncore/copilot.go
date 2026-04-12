@@ -1,7 +1,9 @@
 package tncore
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -13,7 +15,10 @@ func extractCopilotAnswer(raw string) string {
 		if strings.HasPrefix(line, "Total usage") ||
 			strings.HasPrefix(line, "API time") ||
 			strings.HasPrefix(line, "Total session") ||
-			strings.HasPrefix(line, "Breakdown by") {
+			strings.HasPrefix(line, "Breakdown by") ||
+			strings.HasPrefix(line, "Requests") ||
+			strings.HasPrefix(line, "Tokens") ||
+			strings.HasPrefix(line, "Changes") {
 			break
 		}
 		answer = append(answer, line)
@@ -76,4 +81,32 @@ func (a *App) generateCopilotPrompt(input string) string {
 	sb.WriteString("Your answer MUST be EXACTLY in this format, with no extra text: [\"cmd...\", \"cmd...\", ...]\n")
 
 	return sb.String() + input
+}
+
+var jsonArrayRE = regexp.MustCompile(`
+
+\[[^\]
+
+]*\]
+
+`)
+
+func extractStringArray(input string) []string {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil
+	}
+
+	// Find the first JSON array in the string
+	match := jsonArrayRE.FindString(input)
+	if match == "" {
+		return nil
+	}
+
+	var arr []string
+	if err := json.Unmarshal([]byte(match), &arr); err != nil {
+		return nil
+	}
+
+	return arr
 }

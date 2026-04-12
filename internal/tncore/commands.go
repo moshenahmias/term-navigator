@@ -394,20 +394,6 @@ var (
 	commandAlias = make(map[string]string)
 )
 
-func extractStringArray(input string) []string {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return nil
-	}
-
-	var arr []string
-	if err := json.Unmarshal([]byte(input), &arr); err != nil {
-		return nil
-	}
-
-	return arr
-}
-
 func init() {
 	for name, cmd := range commands {
 		for _, alias := range cmd.aliases {

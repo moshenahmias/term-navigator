@@ -62,6 +62,10 @@ func run(ctx context.Context) error {
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
 	for i, devCfg := range cfg.Devices {
+		if devCfg.Disabled {
+			continue
+		}
+
 		if !isValidDevName(devCfg.Name) {
 			return fmt.Errorf("device %d name is invalid (allowed: A-Z, a-z, _ or -)", i)
 		}

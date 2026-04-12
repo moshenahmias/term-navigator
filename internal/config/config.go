@@ -20,22 +20,22 @@ type Config struct {
 }
 
 type DeviceConfig struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Disabled bool   `json:"disabled,omitempty"`
 
 	// local, sftp
 	Path string `json:"path,omitempty"`
 
 	// s3, sftp
-	Key      string   `json:"key,omitempty"`
-	Secret   string   `json:"secret,omitempty"`
-	Endpoint string   `json:"endpoint,omitempty"`
-
+	Key      string `json:"key,omitempty"`
+	Secret   string `json:"secret,omitempty"`
+	Endpoint string `json:"endpoint,omitempty"`
 
 	// s3
-	Buckets  []string `json:"buckets,omitempty"`
-	Region   string   `json:"region,omitempty"`
-	Session  string   `json:"session,omitempty"`
+	Buckets []string `json:"buckets,omitempty"`
+	Region  string   `json:"region,omitempty"`
+	Session string   `json:"session,omitempty"`
 
 	// TLS: s3, sftp
 	InsecureSkipVerify bool   `json:"insecure,omitempty"`

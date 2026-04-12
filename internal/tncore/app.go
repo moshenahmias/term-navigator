@@ -304,18 +304,22 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg = splitStatusMsgLines(msg, a.width)
 		a.msg = msg
 
-		if msg.text == "" {
-			return a, nil
-		}
-
-		if msg.isErr {
-			a.logger.Error(msg.text)
-		} else {
-			a.logger.Info(msg.text)
+		if msg.text != "" {
+			if msg.isErr {
+				a.logger.Error(msg.text)
+			} else {
+				a.logger.Info(msg.text)
+			}
 		}
 
 		if msg.d <= 0 {
-			return a, nil
+			return a, func() tea.Msg {
+				if msg.next != nil {
+					return *msg.next
+				}
+
+				return clearStatusMsg{}
+			}
 		}
 
 		return a, tea.Tick(msg.d, func(time.Time) tea.Msg {
