@@ -3,7 +3,6 @@ package tncore
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 )
 
@@ -83,28 +82,14 @@ func (a *App) generateCopilotPrompt(input string) string {
 	return sb.String() + input
 }
 
-var jsonArrayRE = regexp.MustCompile(`
-
-\[[^\]
-
-]*\]
-
-`)
-
 func extractStringArray(input string) []string {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return nil
 	}
 
-	// Find the first JSON array in the string
-	match := jsonArrayRE.FindString(input)
-	if match == "" {
-		return nil
-	}
-
 	var arr []string
-	if err := json.Unmarshal([]byte(match), &arr); err != nil {
+	if err := json.Unmarshal([]byte(input), &arr); err != nil {
 		return nil
 	}
 

@@ -313,13 +313,13 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if msg.d <= 0 {
-			return a, func() tea.Msg {
-				if msg.next != nil {
+			if msg.next != nil {
+				return a, func() tea.Msg {
 					return *msg.next
 				}
-
-				return clearStatusMsg{}
 			}
+
+			return a, nil
 		}
 
 		return a, tea.Tick(msg.d, func(time.Time) tea.Msg {
