@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 
@@ -37,9 +36,7 @@ func main() {
 	ctx := context.Background()
 
 	if err := run(ctx); err != nil {
-		log.Fatal(err)
-	} else {
-		os.Exit(0)
+		fmt.Fprintln(os.Stderr, err)
 	}
 }
 
