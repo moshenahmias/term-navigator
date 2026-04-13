@@ -69,6 +69,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | ESC | Quit |
 | Ctrl + A + J | Edit JSON |
 | Ctrl + A + H | Go Home |
+| Ctrl + A + R | Refresh |
 
 
 ## 3. 💽 Devices

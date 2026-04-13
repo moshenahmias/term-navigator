@@ -89,8 +89,8 @@ var inputText = map[inputMode]string{
 	inputConfirmCopy:   fmt.Sprintf("Type %s to confirm:", copyConfirmationText),
 	inputConfirmMove:   fmt.Sprintf("Type %s to confirm:", moveConfirmationText),
 	inputChangeDevice:  "Switch to:",
-	inputCommand: "Type 'help' for commands (Use ↓↑ + TAB for completion):",
-	inputConfirmBatch: fmt.Sprintf("Type %s to confirm:", batchConfirmationText),
+	inputCommand:       "Type 'help' for commands (Use ↓↑ + TAB for completion):",
+	inputConfirmBatch:  fmt.Sprintf("Type %s to confirm:", batchConfirmationText),
 }
 
 var _ tea.Model = (*App)(nil)
@@ -478,6 +478,10 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.ctrlActionActive() {
 				return a.goHome()
 			}
+		case "ctrl+r": // Refresh
+			if a.ctrlActionActive() {
+				active.refresh()
+			}
 		case "f4": // Edit / Extract
 			return a.runEdit(false)
 		case "f5":
@@ -726,9 +730,10 @@ func (a *App) renderHelpFooter() string {
 	isLocal := isLocal(pane.explorer)
 
 	footer := fmt.Sprintf(
-		"Edit %sson | Go %some ",
+		"Edit %sson | Go %some | %sefresh",
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
+		footerKey(true, "[R]"),
 	)
 
 	return renderFooter(a.width, footer)
