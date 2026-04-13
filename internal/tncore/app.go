@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/logbuf"
 
@@ -215,6 +216,21 @@ func (a *App) quickSwitchDevice(index int) (tea.Model, tea.Cmd) {
 	deviceName := a.orderedDevices[index]
 	cmd := a.applyChangeDevice(deviceName)
 	return a, cmd
+}
+
+func (a *App) copyPath() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	info, err := pane.Selected()
+	if err != nil {
+		return a, failure("No item selected")
+	}
+
+	path := info.FullPath
+	if err := clipboard.WriteAll(path); err != nil {
+		return a, failuref("Failed to copy: %s", err.Error())
+	}
+
+	return a, statusf("Copied: %s", path)
 }
 
 func splitDeviceName(name string) (base, bucket string) {
@@ -501,6 +517,12 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				digit := int(keyStr[len(keyStr)-1] - '1')
 				return a.quickSwitchDevice(digit)
 			}
+		case "ctrl+p": // Copy full path
+			if a.ctrlActionActive() {
+				if item, b := active.SelectedItem(); b && !item.isParentDir() {
+					return a.copyPath()
+				}
+			}
 		case "f4": // Edit / Extract
 			return a.runEdit(false)
 		case "f5":
@@ -749,11 +771,12 @@ func (a *App) renderHelpFooter() string {
 	isLocal := isLocal(pane.explorer)
 
 	footer := fmt.Sprintf(
-		"Edit %sson | Go %some | %sefresh | Switch to dev %s",
+		"Edit %sson | Go %some | %sefresh | Switch to dev %s | Copy %sath",
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 		footerKey(true, "[R]"),
 		footerKey(true, fmt.Sprintf("[1-%d]", len(a.orderedDevices))),
+		footerKey(itemSelected && !item.isParentDir(), "[P]"),
 	)
 
 	return renderFooter(a.width, footer)

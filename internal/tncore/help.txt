@@ -47,7 +47,9 @@ ESC  Quit
 Ctrl + A + J  Edit JSON
 Ctrl + A + H  Go Home
 Ctrl + A + R  Refresh
+Ctrl + A + P  Copy full path
 Ctrl + A + 1-9  Quick switch to device by number
+
 ======================================================================
 3. DEVICES
 ======================================================================
