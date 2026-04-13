@@ -70,6 +70,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | Ctrl + A + J | Edit JSON |
 | Ctrl + A + H | Go Home |
 | Ctrl + A + R | Refresh |
+| Ctrl + A + 1-9 | Quick switch to device by number |
 
 
 ## 3. 💽 Devices

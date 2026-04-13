@@ -107,6 +107,7 @@ type App struct {
 	ctx              context.Context
 	baseDevs         map[string]*file.LazyDevice
 	allDevs          map[string]struct{} // all runtime device names including "s3/bucket"
+	orderedDevices   []string            // ordered list of device names for quick switch
 	devsHint         string
 	asyncJobRunning  bool
 	asyncJobCancel   context.CancelFunc
@@ -155,6 +156,7 @@ func NewApp(ctx context.Context, baseDevs map[string]*file.LazyDevice, left, rig
 	// These will be replaced with actual bucket names when devices are initialized
 	for name := range baseDevs {
 		app.allDevs[name] = struct{}{}
+		app.orderedDevices = append(app.orderedDevices, name)
 	}
 
 	// Collect all runtime device names for hint
@@ -203,6 +205,16 @@ func (a *App) initPane(pane *Pane, name string) error {
 	pane.refresh()
 
 	return nil
+}
+
+func (a *App) quickSwitchDevice(index int) (tea.Model, tea.Cmd) {
+	if index < 0 || index >= len(a.orderedDevices) {
+		return a, failuref("No device at position %d", index+1)
+	}
+
+	deviceName := a.orderedDevices[index]
+	cmd := a.applyChangeDevice(deviceName)
+	return a, cmd
 }
 
 func splitDeviceName(name string) (base, bucket string) {
@@ -482,6 +494,13 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.ctrlActionActive() {
 				active.refresh()
 			}
+		case "ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8", "ctrl+9":
+			if a.ctrlActionActive() {
+				// Extract digit from key
+				keyStr := msg.String()
+				digit := int(keyStr[len(keyStr)-1] - '1')
+				return a.quickSwitchDevice(digit)
+			}
 		case "f4": // Edit / Extract
 			return a.runEdit(false)
 		case "f5":
@@ -730,10 +749,11 @@ func (a *App) renderHelpFooter() string {
 	isLocal := isLocal(pane.explorer)
 
 	footer := fmt.Sprintf(
-		"Edit %sson | Go %some | %sefresh",
+		"Edit %sson | Go %some | %sefresh | Switch to dev %s",
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 		footerKey(true, "[R]"),
+		footerKey(true, fmt.Sprintf("[1-%d]", len(a.orderedDevices))),
 	)
 
 	return renderFooter(a.width, footer)
