@@ -10,7 +10,7 @@ import (
 )
 
 func (a *App) applyBatch() tea.Cmd {
-	return a.runBatchInner(toBatch...)
+	return a.runBatchInner(a.batchQueue...)
 }
 
 func (a *App) runBatch(path string) tea.Cmd {

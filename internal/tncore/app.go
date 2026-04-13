@@ -78,8 +78,6 @@ const (
 	maxLogHistory          = 300
 )
 
-var toBatch []string
-
 var _, jqErr = exec.LookPath("jq")
 
 var editors = []string{"vi", "nano", "pico"}
@@ -122,6 +120,8 @@ type App struct {
 	logBuffer        fmt.Stringer
 	commands         map[string]command
 	helpModeD        time.Time
+	batchQueue       []string
+	jqAvailable      bool
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -156,16 +156,17 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 	logger := slog.New(slog.NewTextHandler(logBuffer, nil))
 
 	return &App{
-		left:      leftPane,
-		right:     rightPane,
-		focus:     0,
-		textbox:   ti,
-		ctx:       ctx,
-		devs:      devs,
-		devsHint:  strings.Join(slices.Collect(maps.Keys(devs)), ", "),
-		logger:    logger,
-		logBuffer: logBuffer,
-		commands:  commands,
+		left:        leftPane,
+		right:       rightPane,
+		focus:       0,
+		textbox:     ti,
+		ctx:         ctx,
+		devs:        devs,
+		devsHint:    strings.Join(slices.Collect(maps.Keys(devs)), ", "),
+		logger:      logger,
+		logBuffer:   logBuffer,
+		commands:    commands,
+		jqAvailable: jqErr == nil,
 	}, nil
 }
 
@@ -284,14 +285,14 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case batchMsg:
 		if len(msg.lines) > 0 {
-			toBatch = msg.lines
+			a.batchQueue = msg.lines
 			a.inputMode = inputConfirmBatch
 			a.textbox.SetValue("")
 			a.textbox.Placeholder = batchConfirmationText
 			a.textbox.SetSuggestions([]string{batchConfirmationText})
 			a.textbox.Focus()
 		} else {
-			toBatch = nil
+			a.batchQueue = nil
 		}
 		return a, nil
 
@@ -549,9 +550,9 @@ func (a *App) View() tea.View {
 	// 5. Footer
 	var footer string
 	if a.helpBarVisible() {
-		footer = a.secondCommandBar()
+		footer = a.renderHelpFooter()
 	} else {
-		footer = a.commandBar()
+		footer = a.renderMainFooter()
 	}
 
 	// 6. Status bar
@@ -598,191 +599,97 @@ var greyed = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(lipgloss.Color("#555555"))
 
+func footerKey(active bool, label string) string {
+	style := key
+	if !active {
+		style = greyed
+	}
+	return style.Render(label)
+}
+
 func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled, sameDir bool, f []string, format string) string {
 	return fmt.Sprintf(
 		format,
 		key.Render("F1"), f[0],
-		func() lipgloss.Style {
-			if itemSelected && item.isRenamable() {
-				return key
-			}
-
-			return greyed
-		}().Render("F2"), f[1],
-		func() lipgloss.Style {
-			if itemSelected && (item.isViewable() || extractEnabled) {
-				return key
-			}
-
-			return greyed
-		}().Render("F3"), f[2],
-		func() lipgloss.Style {
-			if itemSelected && (item.isEditable() || extractEnabled) {
-				return key
-			}
-
-			return greyed
-		}().Render("F4"), f[3],
-		func() lipgloss.Style {
-			if itemSelected && item.isCopyable() && !sameDir {
-				return key
-			}
-
-			return greyed
-		}().Render("F5"), f[4],
-		func() lipgloss.Style {
-			if itemSelected && item.isMoveable() && !sameDir {
-				return key
-			}
-
-			return greyed
-		}().Render("F6"), f[5],
+		footerKey(itemSelected && item.isRenamable(), "F2"), f[1],
+		footerKey(itemSelected && (item.isViewable() || extractEnabled), "F3"), f[2],
+		footerKey(itemSelected && (item.isEditable() || extractEnabled), "F4"), f[3],
+		footerKey(itemSelected && item.isCopyable() && !sameDir, "F5"), f[4],
+		footerKey(itemSelected && item.isMoveable() && !sameDir, "F6"), f[5],
 		key.Render("F7"), f[6],
-		func() lipgloss.Style {
-			if itemSelected && item.isDeleteable() {
-				return key
-			}
-
-			return greyed
-		}().Render("F8"), f[7],
-		func() lipgloss.Style {
-			if itemSelected && item.hasMetadata() {
-				return key
-			}
-
-			return greyed
-		}().Render("F9"), f[8],
-		func() lipgloss.Style {
-			if len(a.devs) > 1 {
-				return key
-			}
-
-			return greyed
-		}().Render("F10"), f[9],
-		func() lipgloss.Style {
-			if len(a.devs) > 1 && a.left.name != a.right.name {
-				return key
-			}
-
-			return greyed
-		}().Render("F12"), f[10],
+		footerKey(itemSelected && item.isDeleteable(), "F8"), f[7],
+		footerKey(itemSelected && item.hasMetadata(), "F9"), f[8],
+		footerKey(len(a.devs) > 1, "F10"), f[9],
+		footerKey(len(a.devs) > 1 && a.left.name != a.right.name, "F12"), f[10],
 		key.Render("ESC"), f[11],
 	)
 }
 
-func (a *App) commandBar() string {
+var footerFormat = "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
+
+var footerLabelSets = [3][12]string{
+	{"Help", "Rename", "View", "Edit", "Copy →", "Move →", "Mkdir", "Delete", "Info", "Device", "Swap", "Quit"},
+	{"HL", "RN", "VW", "ED", "CP", "MV", "MD", "DL", "IN", "DV", "SW", "QT"},
+	{"H", "R", "V", "E", "C", "M", "F", "D", "I", "/", "S", "Q"},
+}
+
+var footerStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("#222")).
+	Foreground(lipgloss.Color("#ccc"))
+
+func renderFooter(width int, content string) string {
+	return lipgloss.NewStyle().
+		Width(width).
+		Align(lipgloss.Center).
+		Render(footerStyle.Render(content))
+}
+
+func (a *App) renderMainFooter() string {
 	pane, dst := a.panes()
 	item, itemSelected := pane.SelectedItem()
 	extractEnabled := itemSelected && item.isArchive() && isLocal(pane.explorer)
 	sameDir := pane.explorer.DeviceID(a.ctx) == dst.explorer.DeviceID(a.ctx) && pane.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx)
 
-	var f [12]string
-
-	f[0] = "Help"
-	f[1] = "Rename"
-	f[2] = "View"
-	f[3] = "Edit"
-	f[4] = "Copy →"
-	f[5] = "Move →"
-	f[6] = "Mkdir"
-	f[7] = "Delete"
-	f[8] = "Info"
-	f[9] = "Device"
-	f[10] = "Swap"
-	f[11] = "Quit"
+	labels := footerLabelSets[0]
 
 	if extractEnabled {
-		f[3] = "Extract"
+		labels[3] = "Extract"
 	}
 
 	if a.focus == 1 {
-		f[4] = "← Copy"
-		f[5] = "← Move"
+		labels[4] = "← Copy"
+		labels[5] = "← Move"
 	}
 
-	format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
-	footer := a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
+	var footer string
 
-	visibleWidth := lipgloss.Width(footer)
+	for labelSet := 0; labelSet < 3; labelSet++ {
+		f := labels
+		if labelSet > 0 {
+			f = footerLabelSets[labelSet]
+		}
+		footer = a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], footerFormat)
 
-	if visibleWidth > a.width {
-		f[0] = "HL"
-		f[1] = "RN"
-		f[2] = "VW"
-		f[3] = "ED"
-		f[4] = "CP"
-		f[5] = "MV"
-		f[6] = "MD"
-		f[7] = "DL"
-		f[8] = "IN"
-		f[9] = "DV"
-		f[10] = "SW"
-		f[11] = "QT"
-		footer = a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
+		if lipgloss.Width(footer) <= a.width {
+			break
+		}
 	}
 
-	visibleWidth = lipgloss.Width(footer)
-
-	if visibleWidth > a.width {
-		f[0] = "H"
-		f[1] = "R"
-		f[2] = "V"
-		f[3] = "E"
-		f[4] = "C"
-		f[5] = "M"
-		f[6] = "F"
-		f[7] = "D"
-		f[8] = "I"
-		f[9] = "/"
-		f[10] = "S"
-		f[11] = "Q"
-		format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
-		footer = a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
-	}
-
-	footerStyled := lipgloss.NewStyle().
-		Background(lipgloss.Color("#222")).
-		Foreground(lipgloss.Color("#ccc")).
-		Render(footer)
-
-	return lipgloss.NewStyle().
-		Width(a.width).
-		Align(lipgloss.Center).
-		Render(footerStyled)
+	return renderFooter(a.width, footer)
 }
 
-func (a *App) secondCommandBar() string {
+func (a *App) renderHelpFooter() string {
 	pane, _ := a.panes()
 	item, itemSelected := pane.SelectedItem()
 	isLocal := isLocal(pane.explorer)
 
 	footer := fmt.Sprintf(
-		"%sSON-Edit  %some ",
-		func() lipgloss.Style {
-			if itemSelected && item.isEditable() {
-				return key
-			}
-
-			return greyed
-		}().Render("[J]"),
-		func() lipgloss.Style {
-			if isLocal {
-				return key
-			}
-
-			return greyed
-		}().Render("[H]"),
+		"%sJson-Edit  %sHome ",
+		footerKey(itemSelected && item.isEditable(), "[J]"),
+		footerKey(isLocal, "[H]"),
 	)
 
-	footerStyled := lipgloss.NewStyle().
-		Background(lipgloss.Color("#222")).
-		Foreground(lipgloss.Color("#ccc")).
-		Render(footer)
-
-	return lipgloss.NewStyle().
-		Width(a.width).
-		Align(lipgloss.Center).
-		Render(footerStyled)
+	return renderFooter(a.width, footer)
 }
 
 func (a *App) applyRename(text string) tea.Cmd {
@@ -1156,7 +1063,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 
 	var cmd *exec.Cmd
 
-	if jqErr == nil {
+	if a.jqAvailable {
 		cmd = exec.Command("sh", "-c",
 			fmt.Sprintf("(jq . %q 2>/dev/null || cat %q) | less +1", handle.Path(), handle.Path()))
 	} else {
@@ -1268,7 +1175,7 @@ func (a *App) runEditInner(pane *Pane, filename string, jq bool) (tea.Model, tea
 		)
 	}
 
-	cmd := execDefaultEditor(handle.Path(), jq)
+	cmd := execDefaultEditor(handle.Path(), jq, a.jqAvailable)
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
 		var errs []string
@@ -1407,20 +1314,15 @@ func (a *App) refreshPanesForExplorer(active file.Explorer) {
 	}
 }
 
-func execDefaultEditor(path string, jq bool) *exec.Cmd {
+func execDefaultEditor(path string, jq, jqAvailable bool) *exec.Cmd {
 	for _, ed := range editors {
 		if _, err := exec.LookPath(ed); err == nil {
-			// Editor exists
-			if jq && jqErr == nil && ed == "vi" {
-				// Only vi supports the jq filter command
+			if jq && jqAvailable && ed == "vi" {
 				return exec.Command("vi", path, "-c", "silent %!jq .")
 			}
-
-			// Normal open
 			return exec.Command(ed, path)
 		}
 	}
 
-	// No editor found → return a no-op command
 	return exec.Command("true")
 }

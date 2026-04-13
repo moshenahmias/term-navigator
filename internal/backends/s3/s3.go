@@ -375,7 +375,6 @@ func (e *explorer) Rename(ctx context.Context, oldPath, newPath string) error {
 }
 
 func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName string, progress file.ProgressFunc) (file.Temp, error) {
-	// List all objects under the prefix
 	out, err := e.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(e.bucket),
 		Prefix: aws.String(prefix),
@@ -388,25 +387,26 @@ func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName strin
 		return nil, fmt.Errorf("%q is not an object or prefix", displayName)
 	}
 
-	// Create temp .tar.gz file
 	f, err := os.CreateTemp("", "term-nav-s3-prefix-*.tar.gz")
 	if err != nil {
 		return nil, err
 	}
 
+	cleanup := func() {
+		f.Close()
+		os.Remove(f.Name())
+	}
+
 	gz := gzip.NewWriter(f)
 	tw := tar.NewWriter(gz)
 
-	// Stream each object into the tarball
 	for _, obj := range out.Contents {
 		key := *obj.Key
 		name := strings.TrimPrefix(key, prefix)
 		if name == "" {
-			// S3 directory placeholder (e.g., "folder/")
 			continue
 		}
 
-		// Open object
 		o, err := e.client.GetObject(ctx, &s3.GetObjectInput{
 			Bucket: aws.String(e.bucket),
 			Key:    aws.String(key),
@@ -414,70 +414,61 @@ func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName strin
 		if err != nil {
 			tw.Close()
 			gz.Close()
-			f.Close()
-			os.Remove(f.Name())
+			cleanup()
 			return nil, err
 		}
+		defer o.Body.Close()
 
-		// Tar header
 		hdr := &tar.Header{
 			Name:    name,
 			ModTime: *obj.LastModified,
 		}
 
 		if strings.HasSuffix(key, "/") {
-			// Directory
 			hdr.Typeflag = tar.TypeDir
 			hdr.Mode = 0755
 			hdr.Size = 0
 		} else {
-			// File
 			hdr.Typeflag = tar.TypeReg
 			hdr.Mode = 0644
 			hdr.Size = *obj.Size
 		}
 
 		if err := tw.WriteHeader(hdr); err != nil {
-			o.Body.Close()
 			tw.Close()
 			gz.Close()
-			f.Close()
-			os.Remove(f.Name())
+			cleanup()
 			return nil, err
 		}
 
-		// Copy object data
+		var r io.Reader = o.Body
 		if progress != nil {
-			pr := file.AsProgressReader(ctx, o.Body, func(n int64) {
+			r = file.AsProgressReader(ctx, o.Body, func(n int64) {
 				progress(*obj.Key, n, *obj.Size)
 			})
-			_, err = io.Copy(tw, pr)
-		} else {
-			_, err = io.Copy(tw, o.Body)
 		}
 
-		o.Body.Close()
-
-		if err != nil {
+		if _, err := io.Copy(tw, r); err != nil {
 			tw.Close()
 			gz.Close()
-			f.Close()
-			os.Remove(f.Name())
+			cleanup()
 			return nil, err
 		}
 	}
 
-	// Close writers
 	if err := tw.Close(); err != nil {
-		os.Remove(f.Name())
+		gz.Close()
+		cleanup()
 		return nil, err
 	}
 	if err := gz.Close(); err != nil {
-		os.Remove(f.Name())
+		cleanup()
 		return nil, err
 	}
+
+	cleanup = func() {} // prevent cleanup after successful close
+
 	if err := f.Close(); err != nil {
-		os.Remove(f.Name())
 		return nil, err
 	}
 
@@ -485,7 +476,6 @@ func (e *explorer) downloadPrefix(ctx context.Context, prefix, displayName strin
 		if strings.HasSuffix(s, ".tar.gz") {
 			return s
 		}
-
 		return s + ".tar.gz"
 	}}), nil
 }

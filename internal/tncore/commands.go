@@ -211,7 +211,7 @@ var (
 				return check(err)
 			}
 
-			cmd := execDefaultEditor(path, true)
+			cmd := execDefaultEditor(path, true, a.jqAvailable)
 
 			return tea.ExecProcess(cmd, execResolve("Restart required for changes to take effect"))
 		}, aliases: []string{"cfg"}},
@@ -380,7 +380,7 @@ var (
 			}
 
 			a.runAsyncJob(func(name string, n, total int64) string {
-				panic("not gonna be called")
+				return ""
 			}, func(ctx context.Context, progress file.ProgressFunc) tea.Msg {
 				return cmd(ctx, progress)()
 			})
@@ -416,7 +416,10 @@ func (a *App) generateItemSuggestions(text string, filter func(*FileItem) bool) 
 
 	if active := a.activePane(); active != nil {
 		for _, item := range active.list.Items() {
-			fi := item.(*FileItem)
+			fi, ok := item.(*FileItem)
+			if !ok {
+				continue
+			}
 			if filter == nil || filter(fi) {
 				suggestions = append(suggestions, fmt.Sprintf("%s %s", text, fi.Info.Name))
 			}

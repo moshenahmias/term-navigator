@@ -99,18 +99,7 @@ func (l *explorer) List(ctx context.Context) ([]file.Info, error) {
 			continue
 		}
 
-		isSymlink := lstat.Mode()&os.ModeSymlink != 0
-		isDir := e.IsDir() // this follows symlink, but we’ll fix below
-
-		isSymlinkToDir := false
-		if isSymlink {
-			// follow the symlink
-			target, err := os.Stat(full)
-			if err == nil && target.IsDir() {
-				isSymlinkToDir = true
-				isDir = true // treat symlink-to-dir as a directory
-			}
-		}
+		isSymlink, isDir, isSymlinkToDir := resolveSymlinkInfo(full, lstat)
 
 		out = append(out, file.Info{
 			Name:           e.Name(),
@@ -127,29 +116,42 @@ func (l *explorer) List(ctx context.Context) ([]file.Info, error) {
 	return out, nil
 }
 
+func resolveSymlinkInfo(path string, lstat os.FileInfo) (isSymlink, isDir, isSymlinkToDir bool) {
+	isSymlink = lstat.Mode()&os.ModeSymlink != 0
+	isDir = lstat.IsDir()
+
+	if !isSymlink {
+		return
+	}
+
+	target, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+
+	if target.IsDir() {
+		isSymlinkToDir = true
+		isDir = true
+	}
+	return
+}
+
 func (l *explorer) Stat(ctx context.Context, path string) (file.Info, error) {
 	abs := l.Abs(path)
 
-	fi, err := os.Stat(abs)
+	lstat, err := os.Lstat(abs)
 	if err != nil {
 		return file.Info{}, err
 	}
 
-	isSymlink := fi.Mode()&os.ModeSymlink != 0
-	isSymlinkToDir := false
-	if isSymlink {
-		target, err := os.Stat(path) // follows symlink
-		if err == nil && target.IsDir() {
-			isSymlinkToDir = true
-		}
-	}
+	isSymlink, isDir, isSymlinkToDir := resolveSymlinkInfo(abs, lstat)
 
 	return file.Info{
 		Name:           filepath.Base(abs),
 		FullPath:       abs,
-		IsDir:          fi.IsDir(),
-		Size:           fi.Size(),
-		Modified:       fi.ModTime(),
+		IsDir:          isDir,
+		Size:           lstat.Size(),
+		Modified:       lstat.ModTime(),
 		Extra:          nil,
 		IsSymlink:      isSymlink,
 		IsSymlinkToDir: isSymlinkToDir,
