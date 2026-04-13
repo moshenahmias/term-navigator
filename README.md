@@ -67,7 +67,8 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | F12 | Swap left/right devices |
 | / | Filter |
 | ESC | Quit |
-
+| Ctrl + A + J | Edit JSON |
+| Ctrl + A + H | Go Home |
 
 
 ## 3. 💽 Devices

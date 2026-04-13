@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/moshenahmias/term-navigator/internal/backends/local"
+	"github.com/moshenahmias/term-navigator/internal/file"
 )
 
 func bytesFormatter(n int64) string {
@@ -97,3 +100,8 @@ func truncate(s string, width int) string {
 	}
 	return string(r[:width-1]) + "…"
 }
+
+func isLocal(explorer file.Explorer) bool {
+	return explorer.Type() == local.Type
+}
+

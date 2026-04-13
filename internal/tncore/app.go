@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/logbuf"
 
@@ -122,6 +121,7 @@ type App struct {
 	logger           *slog.Logger
 	logBuffer        fmt.Stringer
 	commands         map[string]command
+	helpModeD        time.Time
 }
 
 func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
@@ -417,9 +417,24 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runRename()
 		case "f3": // View
 			return a.runView()
-		case "ctrl+e": // Edit + jq
-			return a.runEdit(true)
+		case "ctrl+a":
+			a.helpModeD = time.Now()
+			return a, tea.Tick(time.Millisecond*500, func(time.Time) tea.Msg {
+				if time.Since(a.helpModeD) > time.Millisecond*250 {
+					a.helpModeD = time.Now().Add(-time.Hour * 24 * 365 * 100)
+					return struct{}{}
+				}
+				return nil
+			})
+		case "ctrl+j": // Edit + jq
+			if a.ctrlActionActive() {
+				return a.runEdit(true)
 
+			}
+		case "ctrl+h": // Go home
+			if a.ctrlActionActive() {
+				return a.goHome()
+			}
 		case "f4": // Edit / Extract
 			return a.runEdit(false)
 		case "f5":
@@ -438,6 +453,8 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.runSwapDevices()
 		case ":":
 			return a.runCommand()
+		case "q":
+			return a, nil
 		}
 	}
 
@@ -478,6 +495,14 @@ func (a *App) renderStatus() string {
 	}
 
 	return a.msg.text
+}
+
+func (a *App) helpBarVisible() bool {
+	return time.Since(a.helpModeD) < time.Millisecond*50
+}
+
+func (a *App) ctrlActionActive() bool {
+	return time.Since(a.helpModeD) < time.Millisecond*420
 }
 
 func (a *App) View() tea.View {
@@ -522,7 +547,12 @@ func (a *App) View() tea.View {
 	}
 
 	// 5. Footer
-	footer := a.commandBar()
+	var footer string
+	if a.helpBarVisible() {
+		footer = a.secondCommandBar()
+	} else {
+		footer = a.commandBar()
+	}
 
 	// 6. Status bar
 	statusBar := a.renderStatus()
@@ -643,7 +673,7 @@ func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled, sameDir 
 func (a *App) commandBar() string {
 	pane, dst := a.panes()
 	item, itemSelected := pane.SelectedItem()
-	extractEnabled := itemSelected && item.isArchive() && pane.explorer.Type() == local.Type
+	extractEnabled := itemSelected && item.isArchive() && isLocal(pane.explorer)
 	sameDir := pane.explorer.DeviceID(a.ctx) == dst.explorer.DeviceID(a.ctx) && pane.explorer.Cwd(a.ctx) == dst.explorer.Cwd(a.ctx)
 
 	var f [12]string
@@ -709,6 +739,40 @@ func (a *App) commandBar() string {
 		format := "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
 		footer = a.buildFooter(item, itemSelected, extractEnabled, sameDir, f[:], format)
 	}
+
+	footerStyled := lipgloss.NewStyle().
+		Background(lipgloss.Color("#222")).
+		Foreground(lipgloss.Color("#ccc")).
+		Render(footer)
+
+	return lipgloss.NewStyle().
+		Width(a.width).
+		Align(lipgloss.Center).
+		Render(footerStyled)
+}
+
+func (a *App) secondCommandBar() string {
+	pane, _ := a.panes()
+	item, itemSelected := pane.SelectedItem()
+	isLocal := isLocal(pane.explorer)
+
+	footer := fmt.Sprintf(
+		"%sSON-Edit  %some ",
+		func() lipgloss.Style {
+			if itemSelected && item.isEditable() {
+				return key
+			}
+
+			return greyed
+		}().Render("[J]"),
+		func() lipgloss.Style {
+			if isLocal {
+				return key
+			}
+
+			return greyed
+		}().Render("[H]"),
+	)
 
 	footerStyled := lipgloss.NewStyle().
 		Background(lipgloss.Color("#222")).
@@ -815,6 +879,7 @@ func (a *App) applyCopyInner(ctx context.Context, src, dst *Pane, from, to strin
 		return newStatusMsg(fmt.Sprintf("Copied %q to %q", from, to))
 	}
 }
+
 func (a *App) applyMove(ctx context.Context, text string, progress file.ProgressFunc) tea.Cmd {
 	src, dst := a.panes()
 
@@ -1123,7 +1188,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 func (a *App) runExtract() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 
-	if pane.explorer.Type() != local.Type {
+	if !isLocal(pane.explorer) {
 		return a, nil
 	}
 
@@ -1145,6 +1210,20 @@ func (a *App) runExtract() (tea.Model, tea.Cmd) {
 		return a, commands["exec"].f(a, "tar", "-xzf", filename)
 	}
 
+	return a, nil
+}
+
+func (a *App) goHome() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+	if isLocal(pane.explorer) {
+		if home, err := os.UserHomeDir(); err == nil {
+			if err := pane.explorer.Chdir(a.ctx, home); err != nil {
+				return a, check(err)
+			}
+
+			pane.refresh()
+		}
+	}
 	return a, nil
 }
 
