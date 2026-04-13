@@ -149,6 +149,8 @@ func (e *explorer) Join(dir, name string) string {
 func (e *explorer) Chdir(ctx context.Context, p string) error {
 	var prefix string
 
+	p = strings.TrimLeft(p, "/")
+
 	// If p is "" or ends with "/", treat it as an Absolute prefix
 	if p == "" || strings.HasSuffix(p, "/") {
 		prefix = p
@@ -199,7 +201,7 @@ func (e *explorer) List(ctx context.Context) ([]file.Info, error) {
 		}
 		items = append(items, file.Info{
 			Name:     name,
-			FullPath: aws.ToString(cp.Prefix),
+			FullPath: "/" + aws.ToString(cp.Prefix),
 			IsDir:    true,
 			Size:     0,
 			Modified: time.Time{},
@@ -218,7 +220,7 @@ func (e *explorer) List(ctx context.Context) ([]file.Info, error) {
 		}
 		items = append(items, file.Info{
 			Name:     name,
-			FullPath: key,
+			FullPath: "/" + key,
 			IsDir:    false,
 			Size:     *obj.Size,
 			Modified: aws.ToTime(obj.LastModified),
@@ -245,7 +247,7 @@ func (e *explorer) Stat(ctx context.Context, p string) (file.Info, error) {
 
 		return file.Info{
 			Name:     name,
-			FullPath: key,
+			FullPath: "/" + key,
 			IsDir:    false,
 			Size:     *head.ContentLength,
 			Modified: aws.ToTime(head.LastModified),
@@ -278,7 +280,7 @@ func (e *explorer) Stat(ctx context.Context, p string) (file.Info, error) {
 
 	return file.Info{
 		Name:     name,
-		FullPath: key,
+		FullPath: "/" + key,
 		IsDir:    true,
 		Size:     0,
 		Modified: time.Time{},
