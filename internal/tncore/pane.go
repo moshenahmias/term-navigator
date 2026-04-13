@@ -270,7 +270,9 @@ func NewPane(ctx context.Context, name string, exp file.Explorer, width, height 
 		name:     name,
 	}
 
-	p.refresh()
+	if exp != nil {
+		p.refresh()
+	}
 	return p
 }
 

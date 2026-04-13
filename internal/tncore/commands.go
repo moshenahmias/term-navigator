@@ -167,7 +167,7 @@ var (
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
 		"device": {f: func(a *App, args ...string) tea.Cmd {
-			if len(a.devs) < 2 {
+			if len(a.baseDevs) < 2 {
 				return nil
 			}
 
@@ -181,7 +181,7 @@ var (
 
 			return a.applyChangeDevice(args[0])
 		}, aliases: []string{"dev"}, suggestions: func(a *App, s string) (sugg []string) {
-			for d := range a.devs {
+			for d := range a.allDevs {
 				sugg = append(sugg, fmt.Sprintf("%s %s", s, d))
 			}
 			return

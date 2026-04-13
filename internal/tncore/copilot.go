@@ -58,8 +58,8 @@ func (a *App) generateCopilotPrompt(input string) string {
 	}
 
 	sb.WriteString("Available devices:\n")
-	for name, dev := range a.devs {
-		fmt.Fprintf(&sb, "Device name: %s, type: %s\n", name, dev.Type())
+	for name := range a.allDevs {
+		fmt.Fprintf(&sb, "- %s\n", name)
 	}
 
 	sb.WriteString("Available commands:\n")

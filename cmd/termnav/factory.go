@@ -24,28 +24,52 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var (
-	factory = map[string]func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error){
-		"local": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
+func buildConstructors(cfg *appcfg.Config) (map[string]*file.LazyDevice, error) {
+	result := make(map[string]*file.LazyDevice)
+
+	for i, devCfg := range cfg.Devices {
+		if devCfg.Disabled && !loadDisabledFlag {
+			continue
+		}
+		
+		if devCfg.Type == "" {
+			return nil, fmt.Errorf("device %d (%s) missing type", i, devCfg.Name)
+		}
+
+		constructor, ok := constructors[devCfg.Type]
+		if !ok {
+			return nil, fmt.Errorf("unknown device type: %s", devCfg.Type)
+		}
+
+		result[devCfg.Name] = file.NewLazyDevice(constructor(&devCfg))
+	}
+
+	return result, nil
+}
+
+var constructors = map[string]func(dev *appcfg.DeviceConfig) file.ExplorerConstructor{
+	"local": func(dev *appcfg.DeviceConfig) file.ExplorerConstructor {
+		return func(ctx context.Context) (map[string]file.Explorer, error) {
 			path := dev.Path
 			if path == "" {
 				path = "."
 			}
 			return map[string]file.Explorer{dev.Name: local.NewExplorer(path)}, nil
-		},
-		"fakefs": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
+		}
+	},
+	"fakefs": func(dev *appcfg.DeviceConfig) file.ExplorerConstructor {
+		return func(ctx context.Context) (map[string]file.Explorer, error) {
 			return map[string]file.Explorer{dev.Name: fakefs.NewExplorer()}, nil
-		},
-		"s3": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
-			// Build options dynamically
+		}
+	},
+	"s3": func(dev *appcfg.DeviceConfig) file.ExplorerConstructor {
+		return func(ctx context.Context) (map[string]file.Explorer, error) {
 			opts := []func(*config.LoadOptions) error{}
 
-			// Region override (optional)
 			if dev.Region != "" {
 				opts = append(opts, config.WithRegion(dev.Region))
 			}
 
-			// Credentials override (optional)
 			if dev.Key != "" && dev.Secret != "" {
 				opts = append(opts, config.WithCredentialsProvider(
 					credentials.NewStaticCredentialsProvider(dev.Key, dev.Secret, dev.Session),
@@ -54,7 +78,6 @@ var (
 
 			opts = append(opts, config.WithClientLogMode(aws.ClientLogMode(0)), config.WithLogger(logging.Nop{}))
 
-			// Load config (this will fall back to env/default chain if no overrides)
 			cfg, err := config.LoadDefaultConfig(ctx, opts...)
 			if err != nil {
 				return nil, err
@@ -69,10 +92,8 @@ var (
 				return nil, err
 			}
 
-			// Build S3 client
 			client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 				if dev.Endpoint != "" {
-					// MinIO / Localstack / custom S3-compatible
 					o.BaseEndpoint = aws.String(dev.Endpoint)
 				}
 
@@ -84,7 +105,8 @@ var (
 				}
 			})
 
-			if len(dev.Buckets) == 0 {
+			buckets := dev.Buckets
+			if len(buckets) == 0 {
 				out, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
 				if err != nil {
 					return nil, fmt.Errorf("listing buckets: %w", err)
@@ -92,24 +114,25 @@ var (
 
 				for _, b := range out.Buckets {
 					if b.Name != nil {
-						dev.Buckets = append(dev.Buckets, *b.Name)
+						buckets = append(buckets, *b.Name)
 					}
 				}
 			}
 
-			if len(dev.Buckets) == 0 {
-				return nil, nil
+			if len(buckets) == 0 {
+				return nil, fmt.Errorf("no buckets found or specified")
 			}
 
-			explorers := make(map[string]file.Explorer, len(dev.Buckets))
-
-			for _, bucket := range dev.Buckets {
+			explorers := make(map[string]file.Explorer, len(buckets))
+			for _, bucket := range buckets {
 				explorers[fmt.Sprintf("%s/%s", dev.Name, bucket)] = s3exp.NewExplorer(client, dev.Endpoint, dev.Region, bucket, "")
 			}
 
 			return explorers, nil
-		},
-		"sftp": func(ctx context.Context, dev *appcfg.DeviceConfig) (map[string]file.Explorer, error) {
+		}
+	},
+	"sftp": func(dev *appcfg.DeviceConfig) file.ExplorerConstructor {
+		return func(ctx context.Context) (map[string]file.Explorer, error) {
 			hostKeyCallback := ssh.InsecureIgnoreHostKey()
 
 			if !dev.InsecureSkipVerify && dev.CAFile != "" {
@@ -149,12 +172,11 @@ var (
 			}
 
 			path := dev.Path
-
 			if path == "" {
 				path = "/"
 			}
 
 			return map[string]file.Explorer{dev.Name: sftpexp.NewExplorer(client, dev.Endpoint, path)}, nil
-		},
-	}
-)
+		}
+	},
+}

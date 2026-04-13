@@ -719,9 +719,11 @@ func (e *explorer) renamePrefix(ctx context.Context, srcPrefix, dstPrefix string
 	return e.deletePrefix(ctx, srcPrefix)
 }
 
-func (s *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {
-	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
+func (e *explorer) Metadata(ctx context.Context, path string) (map[string]string, error) {
+	path = strings.TrimLeft(e.Abs(path), "/")
+
+	out, err := e.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(e.bucket),
 		Key:    aws.String(path),
 	})
 	if err != nil {
@@ -730,7 +732,7 @@ func (s *explorer) Metadata(ctx context.Context, path string) (map[string]string
 
 	m := map[string]string{
 		"Name":          path,
-		"Bucket":        s.bucket,
+		"Bucket":        e.bucket,
 		"Size":          fmt.Sprintf("%d", aws.ToInt64(out.ContentLength)),
 		"Last Modified": out.LastModified.Format(time.RFC3339),
 		"ETag":          aws.ToString(out.ETag),

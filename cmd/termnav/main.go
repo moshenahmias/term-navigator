@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/moshenahmias/term-navigator/internal/config"
-	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/tncore"
 )
 
@@ -63,54 +62,28 @@ func run(ctx context.Context) error {
 		return nil
 	}
 
-	var errs []error
-
 	cfg, err := config.Load(*configPathFlag)
 
 	if err != nil && (!errors.Is(err, os.ErrNotExist) || *configPathFlag != defaultConfigPath) {
-		errs = append(errs, err)
+		fmt.Fprintln(os.Stderr, err)
 	}
 
-	devs := make(map[string]file.Explorer, len(cfg.Devices))
-
 	for i, devCfg := range cfg.Devices {
-		if !loadDisabledFlag && devCfg.Disabled {
-			continue
-		}
-
 		if !isValidDevName(devCfg.Name) {
 			return fmt.Errorf("device %d name is invalid (allowed: A-Z, a-z, _ or -)", i)
 		}
-
-		if devCfg.Type == "" {
-			return fmt.Errorf("device %d (%s) missing type", i, devCfg.Name)
-		}
-
-		constructor, ok := factory[devCfg.Type]
-		if !ok {
-			return errors.New("unknown device type: " + devCfg.Type)
-		}
-		constructed, err := constructor(ctx, &devCfg)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to create device %d (%s): %w", i, devCfg.Name, err))
-		}
-
-		if len(constructed) > 0 {
-			for name, dev := range constructed {
-				if _, exists := devs[name]; exists {
-					return fmt.Errorf("duplicate device name: %s", name)
-				}
-
-				devs[name] = dev
-			}
-		}
 	}
 
-	if len(devs) == 0 {
+	constructors, err := buildConstructors(cfg)
+	if err != nil {
+		return err
+	}
+
+	if len(constructors) == 0 {
 		return errors.New("no valid devices found in config")
 	}
 
-	app, err := tncore.NewApp(ctx, devs, cfg.Left, cfg.Right, 120, 30)
+	app, err := tncore.NewApp(ctx, constructors, cfg.Left, cfg.Right, 120, 30)
 
 	if err != nil {
 		return errors.New("failed to create app: " + err.Error())
@@ -121,20 +94,7 @@ func run(ctx context.Context) error {
 		p.Send(m)
 	}
 
-	done := make(chan struct{})
-
-	if len(errs) > 0 {
-		go func() {
-			defer close(done)
-			app.Send(tncore.NewLongErrorMsgFromErrors(errs...))
-		}()
-	}
-
 	_, err = p.Run()
-
-	if len(errs) > 0 {
-		<-done
-	}
 
 	return err
 }

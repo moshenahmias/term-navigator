@@ -89,12 +89,7 @@ var inputText = map[inputMode]string{
 	inputConfirmCopy:   fmt.Sprintf("Type %s to confirm:", copyConfirmationText),
 	inputConfirmMove:   fmt.Sprintf("Type %s to confirm:", moveConfirmationText),
 	inputChangeDevice:  "Switch to:",
-	inputCommand: fmt.Sprintf("Type 'help' for commands (Use %s+↓↑ + TAB for completion):", func() string {
-		if runtime.GOOS == "darwin" {
-			return "⌥"
-		}
-		return "ALT"
-	}()),
+	inputCommand: "Type 'help' for commands (Use ↓↑ + TAB for completion):",
 	inputConfirmBatch: fmt.Sprintf("Type %s to confirm:", batchConfirmationText),
 }
 
@@ -110,7 +105,8 @@ type App struct {
 	inputMode        inputMode
 	msg              statusMsg
 	ctx              context.Context
-	devs             map[string]file.Explorer
+	baseDevs         map[string]*file.LazyDevice
+	allDevs          map[string]struct{} // all runtime device names including "s3/bucket"
 	devsHint         string
 	asyncJobRunning  bool
 	asyncJobCancel   context.CancelFunc
@@ -124,21 +120,7 @@ type App struct {
 	jqAvailable      bool
 }
 
-func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right string, width, height int) (*App, error) {
-	var leftExp, rightExp file.Explorer
-
-	if exp, exists := devs[left]; exists {
-		leftExp = exp.Copy()
-	} else {
-		return nil, errors.New("left device not found: " + left)
-	}
-
-	if exp, exists := devs[right]; exists {
-		rightExp = exp.Copy()
-	} else {
-		return nil, errors.New("right device not found: " + right)
-	}
-
+func NewApp(ctx context.Context, baseDevs map[string]*file.LazyDevice, left, right string, width, height int) (*App, error) {
 	leftWidth := width / 2
 	rightWidth := width - leftWidth
 
@@ -147,27 +129,87 @@ func NewApp(ctx context.Context, devs map[string]file.Explorer, left, right stri
 	ti.SetWidth(75)
 	ti.ShowSuggestions = true
 
-	leftPane := NewPane(ctx, left, leftExp, leftWidth, height)
-	rightPane := NewPane(ctx, right, rightExp, rightWidth, height)
+	leftPane := NewPane(ctx, left, nil, leftWidth, height)
+	rightPane := NewPane(ctx, right, nil, rightWidth, height)
 
 	leftPane.SetActive(true)
 
 	logBuffer := logbuf.NewLineRingBuffer(maxLogHistory)
 	logger := slog.New(slog.NewTextHandler(logBuffer, nil))
 
-	return &App{
+	app := &App{
 		left:        leftPane,
 		right:       rightPane,
 		focus:       0,
 		textbox:     ti,
 		ctx:         ctx,
-		devs:        devs,
-		devsHint:    strings.Join(slices.Collect(maps.Keys(devs)), ", "),
+		baseDevs:    baseDevs,
+		allDevs:     make(map[string]struct{}),
 		logger:      logger,
 		logBuffer:   logBuffer,
 		commands:    commands,
 		jqAvailable: jqErr == nil,
-	}, nil
+	}
+
+	// Populate allDevs with base device names as fallbacks
+	// These will be replaced with actual bucket names when devices are initialized
+	for name := range baseDevs {
+		app.allDevs[name] = struct{}{}
+	}
+
+	// Collect all runtime device names for hint
+	allNames := []string{}
+	for name := range baseDevs {
+		allNames = append(allNames, name)
+	}
+	app.devsHint = strings.Join(allNames, ", ")
+
+	if err := app.initPane(leftPane, left); err != nil {
+		return nil, fmt.Errorf("left device: %w", err)
+	}
+
+	if err := app.initPane(rightPane, right); err != nil {
+		return nil, fmt.Errorf("right device: %w", err)
+	}
+
+	return app, nil
+}
+
+func (a *App) initPane(pane *Pane, name string) error {
+	baseName, _ := splitDeviceName(name)
+
+	lazy, exists := a.baseDevs[baseName]
+	if !exists {
+		return fmt.Errorf("device %q not found", baseName)
+	}
+
+	devices, err := lazy.Get(a.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to connect to %q: %w", baseName, err)
+	}
+
+	// Register all devices from this base
+	for devName := range devices {
+		a.allDevs[devName] = struct{}{}
+	}
+
+	exp, exists := devices[name]
+	if !exists {
+		return fmt.Errorf("device %q not found (available: %v)", name, slices.Collect(maps.Keys(devices)))
+	}
+
+	pane.explorer = exp.Copy()
+	pane.name = name
+	pane.refresh()
+
+	return nil
+}
+
+func splitDeviceName(name string) (base, bucket string) {
+	if i := strings.Index(name, "/"); i >= 0 {
+		return name[:i], name[i+1:]
+	}
+	return name, ""
 }
 
 func (a *App) Init() tea.Cmd { return nil }
@@ -619,13 +661,13 @@ func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled, sameDir 
 		key.Render("F7"), f[6],
 		footerKey(itemSelected && item.isDeleteable(), "F8"), f[7],
 		footerKey(itemSelected && item.hasMetadata(), "F9"), f[8],
-		footerKey(len(a.devs) > 1, "F10"), f[9],
-		footerKey(len(a.devs) > 1 && a.left.name != a.right.name, "F12"), f[10],
+		footerKey(len(a.baseDevs) > 1, "F10"), f[9],
+		footerKey(len(a.baseDevs) > 1 && a.left.name != a.right.name, "F12"), f[10],
 		key.Render("ESC"), f[11],
 	)
 }
 
-var footerFormat = "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
+var footerFormat = "%s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s  %s %s"
 
 var footerLabelSets = [3][12]string{
 	{"Help", "Rename", "View", "Edit", "Copy →", "Move →", "Mkdir", "Delete", "Info", "Device", "Swap", "Quit"},
@@ -684,7 +726,7 @@ func (a *App) renderHelpFooter() string {
 	isLocal := isLocal(pane.explorer)
 
 	footer := fmt.Sprintf(
-		"%sJson-Edit  %sHome ",
+		"Edit %sson | Go %some ",
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 	)
@@ -903,16 +945,67 @@ func (a *App) applyChangeDevice(text string) tea.Cmd {
 		return nil
 	}
 
-	exp, exists := a.devs[text]
+	// Check if it's a full device name (e.g., "s3/bucket1") or base name (e.g., "s3")
+	baseName, _ := splitDeviceName(text)
+
+	lazy, exists := a.baseDevs[baseName]
 	if !exists {
-		return failure(fmt.Sprintf("Device %q not found. Available devices: %s", text, a.devsHint))
+		return failure(fmt.Sprintf("Device %q not found. Available devices: %s", baseName, a.devsHint))
 	}
 
+	devices, err := lazy.Get(a.ctx)
+	if err != nil {
+		return failuref("Failed to connect to %q: %s", baseName, err.Error())
+	}
+
+	// Update allDevs with actual device names from this base
+	for devName := range devices {
+		a.allDevs[devName] = struct{}{}
+	}
+
+	// Find the exact device name - text might be base name or full name
+	deviceName := text
+	if _, exists := devices[text]; !exists {
+		// User typed a full name that doesn't exist - show error
+		if text != baseName {
+			var choices []string
+			for name := range devices {
+				choices = append(choices, name)
+			}
+			return failure(fmt.Sprintf("Device %q not found. Available: %v", text, choices))
+		}
+
+		// User typed base name - auto-correct if there's only one device
+		if len(devices) == 1 {
+			for name := range devices {
+				deviceName = name
+				break
+			}
+		} else {
+			// Multiple devices available - show them and let user pick via autocomplete
+			var choices []string
+			for name := range devices {
+				choices = append(choices, name)
+			}
+			pane := a.activePane()
+			pane.list.SetFilterText("")
+			a.inputMode = inputChangeDevice
+			a.textbox.SetValue("")
+			a.textbox.SetSuggestions(choices)
+			a.textbox.Placeholder = strings.Join(choices, ", ")
+			a.textbox.Focus()
+			return statusf("Multiple devices found for %q: %v", baseName, choices)
+		}
+	}
+
+	exp := devices[deviceName]
 	pane.explorer = exp.Copy()
-	pane.name = text
+	pane.name = deviceName
 	pane.lastSelectedPath = ""
 
-	// Refresh both panes that show this directory
+	pane.list.SetFilterText("")
+	pane.list.SetFilterState(list.Unfiltered)
+
 	pane.refresh()
 
 	return statusf("Changed device to %q", text)
@@ -1270,10 +1363,10 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
-	if len(a.devs) > 1 {
+	if len(a.baseDevs) > 1 {
 		a.inputMode = inputChangeDevice
 		a.textbox.SetValue("")
-		a.textbox.SetSuggestions(slices.Collect(maps.Keys(a.devs)))
+		a.textbox.SetSuggestions(slices.Collect(maps.Keys(a.allDevs)))
 		a.textbox.Placeholder = a.devsHint
 		a.textbox.Focus()
 	}
@@ -1282,7 +1375,7 @@ func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runSwapDevices() (tea.Model, tea.Cmd) {
-	if len(a.devs) > 1 && a.left.name != a.right.name {
+	if len(a.baseDevs) > 1 && a.left.name != a.right.name {
 		a.left, a.right = a.right, a.left
 		a.focus = 1 - a.focus // switch focus to the other pane
 
