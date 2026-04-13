@@ -19,13 +19,28 @@ var defaultConfigPath string
 var validDevName = regexp.MustCompile(`^[A-Za-z_-]+$`)
 
 var (
-	configPathFlag *string
-	versionFlag    = flag.Bool("version", false, "Print version and exit")
+	configPathFlag   *string
+	versionFlag      bool
+	loadDisabledFlag bool
 )
 
 func init() {
 	defaultConfigPath, _ = config.Path()
 	configPathFlag = flag.String("config", defaultConfigPath, "Path to config file")
+	flag.BoolVar(&versionFlag, "v", false, "Print version and exit")
+	flag.BoolVar(&versionFlag, "version", false, "Print version and exit")
+	flag.BoolVar(&loadDisabledFlag, "ld", false, "Print version and exit")
+	flag.BoolVar(&loadDisabledFlag, "load-disabled", false, "Load disabled devices")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  %s [options]\n\n", os.Args[0])
+
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "  --config <path>        Path to config file (default: %s)\n", defaultConfigPath)
+		fmt.Fprintf(os.Stderr, "  -v, --version          Print version and exit\n")
+		fmt.Fprintf(os.Stderr, "  -ld, --load-disabled   Load disabled devices\n")
+	}
 }
 
 func isValidDevName(s string) bool {
@@ -43,7 +58,7 @@ func main() {
 func run(ctx context.Context) error {
 	flag.Parse()
 
-	if *versionFlag {
+	if versionFlag {
 		fmt.Println(Version)
 		return nil
 	}
@@ -59,7 +74,7 @@ func run(ctx context.Context) error {
 	devs := make(map[string]file.Explorer, len(cfg.Devices))
 
 	for i, devCfg := range cfg.Devices {
-		if devCfg.Disabled {
+		if !loadDisabledFlag && devCfg.Disabled {
 			continue
 		}
 
