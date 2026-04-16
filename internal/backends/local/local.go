@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/moshenahmias/term-navigator/internal/file"
 )
@@ -25,11 +24,11 @@ func NewExplorer(startPath string) file.Explorer {
 	if err != nil {
 		abs = startPath
 	}
-	return &explorer{cwd: abs}
+	return &explorer{cwd: platformNormalizePath(abs)}
 }
 
 func (l *explorer) Copy() file.Explorer {
-	cp := *l // shallow copy
+	cp := *l
 	return &cp
 }
 
@@ -50,7 +49,7 @@ func (l *explorer) PrintableCwd(ctx context.Context) string {
 }
 
 func (l *explorer) IsRoot(ctx context.Context) bool {
-	return l.Cwd(ctx) == "/"
+	return platformIsRoot(l.cwd)
 }
 
 func (l *explorer) Parent(ctx context.Context) (string, bool) {
@@ -171,7 +170,6 @@ func (l *explorer) Read(_ context.Context, path string) (io.ReadCloser, error) {
 func (l *explorer) Write(ctx context.Context, path string, r io.Reader) error {
 	abs := l.Abs(path)
 
-	// Ensure parent directory exists
 	if err := os.MkdirAll(l.Dir(abs), 0755); err != nil {
 		return err
 	}
@@ -218,7 +216,6 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	localPath = l.Abs(localPath)
 	destPath = l.Abs(destPath)
 
-	// No-op if source and destination are identical
 	if localPath == destPath {
 		return nil
 	}
@@ -228,22 +225,17 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 		return err
 	}
 
-	// -----------------------------
-	// CASE 0: Uploading a symlink
-	// -----------------------------
 	if info.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(localPath)
 		if err != nil {
 			return err
 		}
 
-		// Convert relative symlink to absolute
 		if !filepath.IsAbs(target) {
 			target = filepath.Join(filepath.Dir(localPath), target)
 			target = filepath.Clean(target)
 		}
 
-		// Ensure destination directory exists
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 			return err
 		}
@@ -251,9 +243,6 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 		return os.Symlink(target, destPath)
 	}
 
-	// -----------------------------
-	// CASE 1: Uploading a directory
-	// -----------------------------
 	if info.IsDir() {
 		return filepath.Walk(localPath, func(p string, fi os.FileInfo, err error) error {
 			if err != nil {
@@ -264,7 +253,6 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 				return ctx.Err()
 			}
 
-			// Compute relative path inside the directory
 			rel, err := filepath.Rel(localPath, p)
 			if err != nil {
 				return err
@@ -273,24 +261,20 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 			target := filepath.Join(destPath, rel)
 
 			if fi.IsDir() {
-				// Create directory in destination
 				return os.MkdirAll(target, 0755)
 			}
 
-			// Upload file
 			src, err := os.Open(p)
 			if err != nil {
 				return err
 			}
 			defer src.Close()
 
-			// Ensure parent directory exists
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}
 
 			var pr io.Reader = src
-
 			if progress != nil {
 				pr = file.AsProgressReader(ctx, src, func(n int64) {
 					progress(p, n, fi.Size())
@@ -301,10 +285,6 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 		})
 	}
 
-	// -----------------------------
-	// CASE 2: Uploading a single file
-	// -----------------------------
-	// Ensure destination directory exists
 	if err := os.MkdirAll(l.Dir(destPath), 0755); err != nil {
 		return err
 	}
@@ -316,7 +296,6 @@ func (l *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 	defer src.Close()
 
 	var pr io.Reader = src
-
 	if progress != nil {
 		pr = file.AsProgressReader(ctx, src, func(n int64) {
 			progress(localPath, n, info.Size())
@@ -336,17 +315,14 @@ func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string
 
 	meta := make(map[string]string)
 
-	// Basic info
 	meta["Name"] = info.Name()
 	meta["Size"] = fmt.Sprintf("%d bytes", info.Size())
 	meta["Modified"] = info.ModTime().Format("2006-01-02 15:04:05")
 
-	// File mode (permissions)
 	mode := info.Mode()
-	meta["Mode"] = mode.String() // e.g. "-rw-r--r--"
+	meta["Mode"] = mode.String()
 	meta["Mode (octal)"] = fmt.Sprintf("%04o", mode.Perm())
 
-	// Type
 	switch {
 	case mode.IsRegular():
 		meta["Type"] = "file"
@@ -361,11 +337,7 @@ func (l *explorer) Metadata(ctx context.Context, path string) (map[string]string
 		meta["Type"] = mode.Type().String()
 	}
 
-	// Owner info (Unix only)
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		meta["UID"] = fmt.Sprintf("%d", stat.Uid)
-		meta["GID"] = fmt.Sprintf("%d", stat.Gid)
-	}
+	platformAddMetadata(meta, info)
 
 	return meta, nil
 }

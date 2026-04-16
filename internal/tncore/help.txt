@@ -134,34 +134,38 @@ copilot <prompt>
     Generate and execute AI-assisted commands based on your prompt (requires copilot cli).
 
 
-======================================================================
-5. CONFIG FILE (~/.termnav)
-======================================================================
+ ======================================================================
+ 5. CONFIG FILE (~/.termnav)
+ ======================================================================
 
-Example:
+ Example:
 
-{
-  "devices": [
-    { "name": "local", "type": "local", "path": "/home/user" },
-    {
-      "name": "minio",
-      "type": "s3",
-      "bucket": ["mybucket"],
-      "region": "us-east-1",
-      "endpoint": "http://localhost:9000",
-      "key": "minioadmin",
-      "secret": "minioadmin",
-      "insecure": true
-    },
-    {
-      "name": "sftp",
-      "type": "sftp",
-      "path": "/",
-      "key": "foo",
-      "secret": "pass",
-      "endpoint": "localhost:2222",
-      "insecure": true
-    }
+ {
+   "devices": [
+     { "name": "local", "type": "local", "path": "/home/user" },
+
+     // Windows: auto-detect drives, or specify drives explicitly
+     { "name": "local", "type": "local", "drives": ["C", "D", "E"] },
+
+     {
+       "name": "minio",
+       "type": "s3",
+       "bucket": ["mybucket"],
+       "region": "us-east-1",
+       "endpoint": "http://localhost:9000",
+       "key": "minioadmin",
+       "secret": "minioadmin",
+       "insecure": true
+     },
+     {
+       "name": "sftp",
+       "type": "sftp",
+       "path": "/",
+       "key": "foo",
+       "secret": "pass",
+       "endpoint": "localhost:2222",
+       "insecure": true
+     }
   ],
   "left": "local",
   "right": "sftp"
@@ -173,6 +177,7 @@ Example:
 | name                 | Unique identifier for the device              | local, s3, fakefs        |
 | type                 | Device type ("local", "s3", "fakefs")         | local, s3, fakefs        |
 | path                 | Local filesystem path                         | local                    |
+| drives               | Windows drive letters (auto-detected if empty)| local (Windows)           |
 | buckets              | S3 bucket names (optional)                    | s3                       |
 | region               | AWS region (optional)                         | s3                       |
 | key                  | Static access key (optional)                  | s3, sftp                 |

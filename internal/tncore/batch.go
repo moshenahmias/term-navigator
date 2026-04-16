@@ -39,7 +39,7 @@ func (a *App) runBatch(path string) tea.Cmd {
 }
 
 func (a *App) showBatch(lines ...string) tea.Cmd {
-	cmd := exec.Command("less")
+	cmd := exec.Command("sh", "-c", "less")
 	cmd.Stdin = strings.NewReader(strings.Join(lines, "\n"))
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {

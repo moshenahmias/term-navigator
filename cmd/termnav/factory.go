@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go/logging"
 	"github.com/moshenahmias/term-navigator/internal/backends/fakefs"
-	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	s3exp "github.com/moshenahmias/term-navigator/internal/backends/s3"
 	sftpexp "github.com/moshenahmias/term-navigator/internal/backends/sftp"
 
@@ -31,7 +30,7 @@ func buildConstructors(cfg *appcfg.Config) (map[string]*file.LazyDevice, error) 
 		if devCfg.Disabled && !loadDisabledFlag {
 			continue
 		}
-		
+
 		if devCfg.Type == "" {
 			return nil, fmt.Errorf("device %d (%s) missing type", i, devCfg.Name)
 		}
@@ -48,15 +47,6 @@ func buildConstructors(cfg *appcfg.Config) (map[string]*file.LazyDevice, error) 
 }
 
 var constructors = map[string]func(dev *appcfg.DeviceConfig) file.ExplorerConstructor{
-	"local": func(dev *appcfg.DeviceConfig) file.ExplorerConstructor {
-		return func(ctx context.Context) (map[string]file.Explorer, error) {
-			path := dev.Path
-			if path == "" {
-				path = "."
-			}
-			return map[string]file.Explorer{dev.Name: local.NewExplorer(path)}, nil
-		}
-	},
 	"fakefs": func(dev *appcfg.DeviceConfig) file.ExplorerConstructor {
 		return func(ctx context.Context) (map[string]file.Explorer, error) {
 			return map[string]file.Explorer{dev.Name: fakefs.NewExplorer()}, nil

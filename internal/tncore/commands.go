@@ -8,12 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	"github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
+	"github.com/moshenahmias/term-navigator/internal/platform"
 )
 
 var (
@@ -54,7 +54,7 @@ var (
 				return failure("Usage: logs")
 			}
 
-			cmd := exec.Command("less", "+G")
+			cmd := exec.Command("sh", "-c", "less +G")
 			cmd.Stdin = strings.NewReader(a.logBuffer.String())
 
 			return tea.ExecProcess(cmd, execCheck())
@@ -347,16 +347,9 @@ var (
 			cmd := func(ctx context.Context, _ file.ProgressFunc) func() tea.Msg {
 				return func() tea.Msg {
 					cmd := exec.CommandContext(ctx, "copilot", "-p", prompt)
-					cmd.SysProcAttr = &syscall.SysProcAttr{
-						Setpgid: true,
-					}
+					platform.SetupProcessGroup(cmd)
 
-					stop := context.AfterFunc(ctx, func() {
-						pgid, _ := syscall.Getpgid(cmd.Process.Pid)
-						syscall.Kill(-pgid, syscall.SIGKILL)
-
-					})
-
+					stop := platform.StopOnContext(ctx, cmd)
 					defer stop()
 
 					out, err := cmd.CombinedOutput()

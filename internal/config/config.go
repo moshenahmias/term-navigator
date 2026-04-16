@@ -7,10 +7,9 @@ import (
 )
 
 var (
-	DefaultConfigName = ".termnav"
-	LocalType         = "local"
-	DefaultType       = LocalType
-	Types             = []string{LocalType, "s3"}
+	LocalType   = "local"
+	DefaultType = LocalType
+	Types       = []string{LocalType, "s3"}
 )
 
 type Config struct {
@@ -26,6 +25,9 @@ type DeviceConfig struct {
 
 	// local, sftp
 	Path string `json:"path,omitempty"`
+
+	// local (Windows)
+	Drives []string `json:"drives,omitempty"`
 
 	// s3, sftp
 	Key      string `json:"key,omitempty"`
@@ -60,7 +62,7 @@ func Path() (string, error) {
 		return "", err
 	}
 
-	path := filepath.Join(home, DefaultConfigName)
+	path := filepath.Join(home, defaultConfigName())
 	return path, nil
 }
 

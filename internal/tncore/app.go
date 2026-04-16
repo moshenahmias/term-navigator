@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/atotto/clipboard"
+	"github.com/moshenahmias/term-navigator/internal/editor"
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/logbuf"
 
@@ -1208,7 +1209,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		cmd = exec.Command("sh", "-c",
 			fmt.Sprintf("(jq . %q 2>/dev/null || cat %q) | less +1", handle.Path(), handle.Path()))
 	} else {
-		cmd = exec.Command("less", "+1", handle.Path())
+		cmd = editor.RunPager(handle.Path())
 	}
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
@@ -1351,7 +1352,7 @@ func (a *App) runEditInner(pane *Pane, filename string, jq bool) (tea.Model, tea
 }
 
 func (a *App) viewText(text string) (tea.Model, tea.Cmd) {
-	cmd := exec.Command("less", "+1")
+	cmd := exec.Command("sh", "-c", "less +1")
 	cmd.Stdin = strings.NewReader(text)
 
 	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
@@ -1404,7 +1405,7 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 
 	s := formatMetadata(metadata)
 
-	cmd := exec.Command("less", "+1")
+	cmd := exec.Command("sh", "-c", "less +1")
 	cmd.Stdin = strings.NewReader(s)
 
 	return a, tea.ExecProcess(cmd, execCheck())
@@ -1456,14 +1457,5 @@ func (a *App) refreshPanesForExplorer(active file.Explorer) {
 }
 
 func execDefaultEditor(path string, jq, jqAvailable bool) *exec.Cmd {
-	for _, ed := range editors {
-		if _, err := exec.LookPath(ed); err == nil {
-			if jq && jqAvailable && ed == "vi" {
-				return exec.Command("vi", path, "-c", "silent %!jq .")
-			}
-			return exec.Command(ed, path)
-		}
-	}
-
-	return exec.Command("true")
+	return editor.RunEditor(path, jq && jqAvailable)
 }
