@@ -5,6 +5,7 @@ package tncore
 import (
 	"os"
 	"os/exec"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -28,4 +29,28 @@ func (a *App) viewText(text string) (tea.Model, tea.Cmd) {
 		// Delete immediately after launching
 		return NewLongErrorMsgFromErrors(os.Remove(tmp.Name()), err)
 	})
+}
+
+func (a *App) runExtract() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+
+	if !isLocal(pane.explorer) {
+		return a, nil
+	}
+
+	item, ok := pane.SelectedItem()
+	if !ok || !item.isArchive() {
+		return a, nil
+	}
+
+	filename := item.Info.FullPath
+
+	pane.lastSelectedPath = filename
+
+	switch {
+	case strings.HasSuffix(filename, ".zip"), strings.HasSuffix(filename, ".tgz"), strings.HasSuffix(filename, ".tar"), strings.HasSuffix(filename, ".tar.gz"):
+		return a, commands["exec"].f(a, "cmd", "/c", "tar", "-xf", filename)
+	}
+
+	return a, nil
 }

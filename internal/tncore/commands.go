@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/moshenahmias/term-navigator/internal/backends/local"
 	"github.com/moshenahmias/term-navigator/internal/config"
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/platform"
@@ -207,7 +206,7 @@ var (
 
 			pane := a.activePane()
 
-			if pane.explorer.Type() != local.Type {
+			if !isLocal(pane.explorer) {
 				return failuref("exec works only for local devices")
 			}
 

@@ -1231,34 +1231,6 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 	})
 }
 
-func (a *App) runExtract() (tea.Model, tea.Cmd) {
-	pane := a.activePane()
-
-	if !isLocal(pane.explorer) {
-		return a, nil
-	}
-
-	item, ok := pane.SelectedItem()
-	if !ok || !item.isArchive() {
-		return a, nil
-	}
-
-	filename := item.Info.FullPath
-
-	pane.lastSelectedPath = filename
-
-	switch {
-	case strings.HasSuffix(filename, ".zip"):
-		return a, commands["exec"].f(a, "unzip", "-o", filename)
-	case strings.HasSuffix(filename, ".tar"):
-		return a, commands["exec"].f(a, "tar", "-xf", filename)
-	case strings.HasSuffix(filename, ".tgz"), strings.HasSuffix(filename, ".tar.gz"):
-		return a, commands["exec"].f(a, "tar", "-xzf", filename)
-	}
-
-	return a, nil
-}
-
 func (a *App) goHome() (tea.Model, tea.Cmd) {
 	pane := a.activePane()
 	if isLocal(pane.explorer) {
