@@ -464,9 +464,15 @@ func (e *explorer) UploadFrom(ctx context.Context, localPath, destPath string, p
 		return e.uploadDir(ctx, localPath, destPath, progress)
 	}
 
-	return e.uploadFile(ctx, localPath, destPath, func(n int64) {
-		progress(localPath, n, info.Size())
-	})
+	var p file.TotalReadFunc
+
+	if progress != nil {
+		p = func(n int64) {
+			progress(localPath, n, info.Size())
+		}
+	}
+
+	return e.uploadFile(ctx, localPath, destPath, p)
 }
 
 func (e *explorer) uploadFile(ctx context.Context, localPath, destPath string, progress file.TotalReadFunc) error {
