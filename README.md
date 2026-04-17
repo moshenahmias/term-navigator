@@ -71,7 +71,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | Ctrl + A + H | Go Home |
 | Ctrl + A + R | Refresh |
 | Ctrl + A + P | Copy full path |
-| Ctrl + A + 1-9 | Quick switch to device by number |
+| Ctrl + A + 1-9 | Quick switch to device by number (Unix/macOS only) |
 
 
 ## 3. 💽 Devices
@@ -141,7 +141,10 @@ cd <folder>
     Change directory. Use ".." or the parent entry to go up.
 
 shell
-    Open your system shell in the current directory.
+    Open your system shell in the current directory (Unix/macOS).
+
+cmd
+    Open Windows Command Prompt in the current directory (Windows only).
 
 logs
     View logs.
