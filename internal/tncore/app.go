@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/atotto/clipboard"
-	"github.com/moshenahmias/term-navigator/internal/editor"
 	"github.com/moshenahmias/term-navigator/internal/file"
 	"github.com/moshenahmias/term-navigator/internal/logbuf"
 
@@ -707,8 +706,8 @@ func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled, sameDir 
 		key.Render("F7"), f[6],
 		footerKey(itemSelected && item.isDeleteable(), "F8"), f[7],
 		footerKey(itemSelected && item.hasMetadata(), "F9"), f[8],
-		footerKey(len(a.baseDevs) > 1, "F10"), f[9],
-		footerKey(len(a.baseDevs) > 1 && a.left.name != a.right.name, "F12"), f[10],
+		footerKey(len(a.baseDevs) > 0, "F10"), f[9],
+		footerKey(len(a.baseDevs) > 0 && a.left.name != a.right.name, "F12"), f[10],
 		key.Render("ESC"), f[11],
 	)
 }
@@ -776,7 +775,7 @@ func (a *App) renderHelpFooter() string {
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 		footerKey(true, "[R]"),
-		footerKey(true, fmt.Sprintf("[1-%d]", len(a.orderedDevices))),
+		footerKey(true, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
 		footerKey(itemSelected && !item.isParentDir(), "[P]"),
 	)
 
@@ -1209,7 +1208,7 @@ func (a *App) runViewInner(pane *Pane, filename string) (tea.Model, tea.Cmd) {
 		cmd = exec.Command("sh", "-c",
 			fmt.Sprintf("(jq . %q 2>/dev/null || cat %q) | less +1", handle.Path(), handle.Path()))
 	} else {
-		cmd = editor.RunPager(handle.Path())
+		cmd = runPager(handle.Path())
 	}
 
 	return a, tea.ExecProcess(cmd, func(procErr error) tea.Msg {
@@ -1412,7 +1411,7 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
-	if len(a.baseDevs) > 1 {
+	if len(a.baseDevs) > 0 {
 		a.inputMode = inputChangeDevice
 		a.textbox.SetValue("")
 		a.textbox.SetSuggestions(slices.Collect(maps.Keys(a.allDevs)))
@@ -1457,5 +1456,5 @@ func (a *App) refreshPanesForExplorer(active file.Explorer) {
 }
 
 func execDefaultEditor(path string, jq, jqAvailable bool) *exec.Cmd {
-	return editor.RunEditor(path, jq && jqAvailable)
+	return runEditor(path, jq && jqAvailable)
 }

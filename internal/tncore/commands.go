@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -48,16 +47,6 @@ var (
 			a.right.SetActive(a.focus == 1)
 
 			return nil
-		}},
-		"logs": {f: func(a *App, args ...string) tea.Cmd {
-			if len(args) != 0 {
-				return failure("Usage: logs")
-			}
-
-			cmd := exec.Command("sh", "-c", "less +G")
-			cmd.Stdin = strings.NewReader(a.logBuffer.String())
-
-			return tea.ExecProcess(cmd, execCheck())
 		}},
 		"help": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 0 {
@@ -167,10 +156,6 @@ var (
 			return a.generateItemSuggestions(s, allButParentDirItemSuggestionsFilter)
 		}},
 		"device": {f: func(a *App, args ...string) tea.Cmd {
-			if len(a.baseDevs) < 2 {
-				return nil
-			}
-
 			if len(args) != 1 {
 				return failure("Usage: device <name>")
 			}
@@ -281,32 +266,6 @@ var (
 			return nil
 		}, suggestions: func(a *App, s string) []string {
 			return a.generateItemSuggestions(s, dirsOnlyItemSuggestionsFilter)
-		}},
-		"shell": {f: func(a *App, args ...string) tea.Cmd {
-			if len(args) != 0 {
-				return func() tea.Msg {
-					return newErrorMsg("Usage: shell")
-				}
-			}
-
-			shell := os.Getenv("SHELL")
-			if shell == "" {
-				shell = "/bin/sh"
-			}
-
-			cmd := exec.Command(shell)
-
-			pane := a.activePane()
-
-			if pane.explorer.Type() == local.Type {
-				cmd.Dir = a.activePane().explorer.Cwd(a.ctx)
-			}
-
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-
-			return tea.ExecProcess(cmd, execResolve("Returned from shell"))
 		}},
 		"batch": {f: func(a *App, args ...string) tea.Cmd {
 			if len(args) != 1 {

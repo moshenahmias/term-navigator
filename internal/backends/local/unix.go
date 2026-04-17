@@ -3,6 +3,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"syscall"
@@ -21,4 +22,8 @@ func platformAddMetadata(meta map[string]string, info os.FileInfo) {
 		meta["UID"] = fmt.Sprintf("%d", stat.Uid)
 		meta["GID"] = fmt.Sprintf("%d", stat.Gid)
 	}
+}
+
+func (l *explorer) DeviceID(context.Context) string {
+	return Type
 }

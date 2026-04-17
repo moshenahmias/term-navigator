@@ -36,10 +36,6 @@ func (l *explorer) Type() string {
 	return Type
 }
 
-func (l *explorer) DeviceID(context.Context) string {
-	return Type
-}
-
 func (l *explorer) Cwd(context.Context) string {
 	return l.cwd
 }

@@ -50,12 +50,6 @@ var DefaultDevice = DeviceConfig{
 	Type: DefaultType,
 }
 
-var Default = Config{
-	Devices: []DeviceConfig{DefaultDevice},
-	Left:    DefaultDevice.Name,
-	Right:   DefaultDevice.Name,
-}
-
 func Path() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

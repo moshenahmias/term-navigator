@@ -3,6 +3,8 @@
 package local
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
@@ -51,4 +53,8 @@ func PlatformDetectDrives() []string {
 		}
 	}
 	return drives
+}
+
+func (l *explorer) DeviceID(context.Context) string {
+	return fmt.Sprintf("%s/%d", Type, l.cwd[0])
 }
