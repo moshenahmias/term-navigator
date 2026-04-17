@@ -377,7 +377,7 @@ func (p *Pane) Resize(width, height int) {
 
 	// list must be smaller than pane so border has room
 	p.list.SetSize(width, height-3)
-	p.list.SetShowHelp(p.width > 46) // hide help on very narrow widths
+	p.list.SetShowHelp(p.width > 60) // hide help on very narrow widths
 }
 
 func (p *Pane) SelectedItem() (*FileItem, bool) {
