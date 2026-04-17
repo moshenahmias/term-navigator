@@ -1,7 +1,8 @@
 .PHONY: build clean test \
 		dist-all \
 		dist-macos-amd64 dist-macos-arm64 \
-		dist-linux-amd64 dist-linux-arm64 dist-linux-arm dist-linux-386
+		dist-linux-amd64 dist-linux-arm64 dist-linux-arm dist-linux-386 \
+		dist-windows-amd64 dist-windows-386
 
 build:
 	go mod tidy
@@ -11,7 +12,7 @@ install:
 	cp bin/termnav /usr/local/bin/termnav
 
 clean:
-	rm -rf bin/
+	rm -rf bin/ dist/
 
 test:
 	go test ./cmd/termnav
@@ -59,5 +60,15 @@ dist-linux-386:
 		-C linux-386 termnav \
 		-C ../.. LICENSE
 
-dist-all: dist-macos-amd64 dist-macos-arm64 dist-linux-amd64 dist-linux-arm64 dist-linux-arm dist-linux-386
+dist-all: dist-macos-amd64 dist-macos-arm64 dist-linux-amd64 dist-linux-arm64 dist-linux-arm dist-linux-386 dist-windows-amd64 dist-windows-386
 	@echo "All distributions built."
+
+dist-windows-amd64:
+	mkdir -p dist/windows-amd64/
+	GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o dist/windows-amd64/termnav.exe ./cmd/termnav
+	cd dist && zip -j termnav-windows-amd64-$(VERSION).zip windows-amd64/termnav.exe ../LICENSE
+
+dist-windows-386:
+	mkdir -p dist/windows-386/
+	GOOS=windows GOARCH=386 go build -ldflags "-X main.Version=$(VERSION)" -o dist/windows-386/termnav.exe ./cmd/termnav
+	cd dist && zip -j termnav-windows-386-$(VERSION).zip windows-386/termnav.exe ../LICENSE
