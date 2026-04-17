@@ -81,8 +81,6 @@ const (
 
 var _, jqErr = exec.LookPath("jq")
 
-var editors = []string{"vi", "nano", "pico"}
-
 var inputText = map[inputMode]string{
 	inputRename:        "Rename:",
 	inputMkdir:         "New directory name:",
@@ -150,7 +148,7 @@ func NewApp(ctx context.Context, baseDevs map[string]*file.LazyDevice, left, rig
 		logger:      logger,
 		logBuffer:   logBuffer,
 		commands:    commands,
-		jqAvailable: jqErr == nil,
+		jqAvailable: jqErr == nil && runtime.GOOS != "windows",
 	}
 
 	// Populate allDevs with base device names as fallbacks
@@ -511,7 +509,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				active.refresh()
 			}
 		case "ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8", "ctrl+9":
-			if a.ctrlActionActive() {
+			if runtime.GOOS != "windows" && a.ctrlActionActive() {
 				// Extract digit from key
 				keyStr := msg.String()
 				digit := int(keyStr[len(keyStr)-1] - '1')
@@ -775,7 +773,7 @@ func (a *App) renderHelpFooter() string {
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 		footerKey(true, "[R]"),
-		footerKey(true, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
+		footerKey(runtime.GOOS != "windows" && len(a.orderedDevices) > 0, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
 		footerKey(itemSelected && !item.isParentDir(), "[P]"),
 	)
 
@@ -1346,18 +1344,6 @@ func (a *App) runEditInner(pane *Pane, filename string, jq bool) (tea.Model, tea
 		// Refresh both panes that show this directory
 		a.refreshPanesForExplorer(pane.explorer)
 
-		return nil
-	})
-}
-
-func (a *App) viewText(text string) (tea.Model, tea.Cmd) {
-	cmd := exec.Command("sh", "-c", "less +1")
-	cmd.Stdin = strings.NewReader(text)
-
-	return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			return check(err)()
-		}
 		return nil
 	})
 }
