@@ -12,6 +12,11 @@ var (
 	Types       = []string{LocalType, "s3"}
 )
 
+var DefaultDevice = DeviceConfig{
+	Name: DefaultType,
+	Type: DefaultType,
+}
+
 type Config struct {
 	Devices []DeviceConfig `json:"devices"`
 	Left    string         `json:"left,omitempty"`
@@ -43,11 +48,6 @@ type DeviceConfig struct {
 	InsecureSkipVerify bool   `json:"insecure,omitempty"`
 	CAFile             string `json:"ca_file,omitempty"`
 	ExpectedCertName   string `json:"expected_cert_name,omitempty"`
-}
-
-var DefaultDevice = DeviceConfig{
-	Name: DefaultType,
-	Type: DefaultType,
 }
 
 func Path() (string, error) {

@@ -496,7 +496,7 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return nil
 			})
 		case "ctrl+j": // Edit + jq
-			if a.ctrlActionActive() {
+			if runtime.GOOS != "windows" && a.ctrlActionActive() {
 				return a.runEdit(true)
 
 			}
@@ -770,7 +770,7 @@ func (a *App) renderHelpFooter() string {
 
 	footer := fmt.Sprintf(
 		"Edit %sson | Go %some | %sefresh | Switch to dev %s | Copy %sath",
-		footerKey(itemSelected && item.isEditable(), "[J]"),
+		footerKey(runtime.GOOS != "windows" && itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 		footerKey(true, "[R]"),
 		footerKey(runtime.GOOS != "windows" && len(a.orderedDevices) > 0, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
@@ -1362,10 +1362,7 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 
 	s := formatMetadata(metadata)
 
-	cmd := exec.Command("sh", "-c", "less +1")
-	cmd.Stdin = strings.NewReader(s)
-
-	return a, tea.ExecProcess(cmd, execCheck())
+	return a.viewText(s)
 }
 
 func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
