@@ -159,10 +159,8 @@ func NewApp(ctx context.Context, baseDevs map[string]*file.LazyDevice, left, rig
 	}
 
 	// Collect all runtime device names for hint
-	allNames := []string{}
-	for name := range baseDevs {
-		allNames = append(allNames, name)
-	}
+	allNames := slices.Collect(maps.Keys(baseDevs))
+
 	app.devsHint = strings.Join(allNames, ", ")
 
 	if err := app.initPane(leftPane, left); err != nil {
@@ -567,10 +565,6 @@ var errorStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("#FF0000")).
 	Foreground(lipgloss.Color("#FFFFFF"))
 
-var successStyle = lipgloss.NewStyle().
-	Background(lipgloss.Color("#00AA00")).
-	Foreground(lipgloss.Color("#FFFFFF"))
-
 func (a *App) renderStatus() string {
 	if a.msg.text == "" {
 		return ""
@@ -704,8 +698,8 @@ func (a *App) buildFooter(item *FileItem, itemSelected, extractEnabled, sameDir 
 		key.Render("F7"), f[6],
 		footerKey(itemSelected && item.isDeleteable(), "F8"), f[7],
 		footerKey(itemSelected && item.hasMetadata(), "F9"), f[8],
-		footerKey(len(a.baseDevs) > 0, "F10"), f[9],
-		footerKey(len(a.baseDevs) > 0 && a.left.name != a.right.name, "F12"), f[10],
+		footerKey(len(a.allDevs) > 0, "F10"), f[9],
+		footerKey(len(a.allDevs) > 0 && a.left.name != a.right.name, "F12"), f[10],
 		key.Render("ESC"), f[11],
 	)
 }
@@ -759,23 +753,6 @@ func (a *App) renderMainFooter() string {
 			break
 		}
 	}
-
-	return renderFooter(a.width, footer)
-}
-
-func (a *App) renderHelpFooter() string {
-	pane, _ := a.panes()
-	item, itemSelected := pane.SelectedItem()
-	isLocal := isLocal(pane.explorer)
-
-	footer := fmt.Sprintf(
-		"Edit %sson | Go %some | %sefresh | Switch to dev %s | Copy %sath",
-		footerKey(runtime.GOOS != "windows" && itemSelected && item.isEditable(), "[J]"),
-		footerKey(isLocal, "[H]"),
-		footerKey(true, "[R]"),
-		footerKey(runtime.GOOS != "windows" && len(a.orderedDevices) > 0, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
-		footerKey(itemSelected && !item.isParentDir(), "[P]"),
-	)
 
 	return renderFooter(a.width, footer)
 }
@@ -1366,7 +1343,7 @@ func (a *App) runMetadataInner(pane *Pane, path string) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
-	if len(a.baseDevs) > 0 {
+	if len(a.allDevs) > 1 {
 		a.inputMode = inputChangeDevice
 		a.textbox.SetValue("")
 		a.textbox.SetSuggestions(slices.Collect(maps.Keys(a.allDevs)))
@@ -1378,7 +1355,7 @@ func (a *App) runChangeDevice() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) runSwapDevices() (tea.Model, tea.Cmd) {
-	if len(a.baseDevs) > 1 && a.left.name != a.right.name {
+	if len(a.allDevs) > 1 && a.left.name != a.right.name {
 		a.left, a.right = a.right, a.left
 		a.focus = 1 - a.focus // switch focus to the other pane
 

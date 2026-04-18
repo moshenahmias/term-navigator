@@ -349,7 +349,7 @@ func (p *Pane) Update(msg tea.Msg) (*Pane, tea.Cmd) {
 }
 
 func (p *Pane) View() string {
-	cwd := " " + p.name + " " + p.explorer.PrintableCwd(p.ctx)
+	cwd := " [" + p.name + "] " + p.explorer.PrintableCwd(p.ctx)
 	cwd = truncateLeft(cwd, p.width-3) // account for borders
 
 	header := lipgloss.NewStyle().

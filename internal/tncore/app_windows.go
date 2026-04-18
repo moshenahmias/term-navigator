@@ -3,6 +3,7 @@
 package tncore
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -53,4 +54,19 @@ func (a *App) runExtract() (tea.Model, tea.Cmd) {
 	}
 
 	return a, nil
+}
+
+func (a *App) renderHelpFooter() string {
+	pane, _ := a.panes()
+	item, itemSelected := pane.SelectedItem()
+	isLocal := isLocal(pane.explorer)
+
+	footer := fmt.Sprintf(
+		"Go %some | %sefresh | Copy %sath",
+		footerKey(isLocal, "[H]"),
+		footerKey(true, "[R]"),
+		footerKey(itemSelected && !item.isParentDir(), "[P]"),
+	)
+
+	return renderFooter(a.width, footer)
 }
