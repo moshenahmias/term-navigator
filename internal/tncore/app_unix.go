@@ -94,7 +94,7 @@ func (a *App) renderHelpFooter() string {
 		footerKey(true, "[R]"),
 		footerKey(len(a.orderedDevices) > 0, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
 		footerKey(itemSelected && !item.isParentDir(), "[P]"),
-		footerKey(itemSelected && item.isArchivable(), "[Z]"),
+		footerKey(isLocal && itemSelected && item.isArchivable(), "[Z]"),
 	)
 
 	return renderFooter(a.width, footer)
