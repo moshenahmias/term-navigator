@@ -166,29 +166,38 @@ copilot <prompt>
 Example:
 
 ```json
-{
-  "devices": [
-    { "name": "local", "type": "local", "path": "/home/user" },
-    {
-      "name": "minio",
-      "type": "s3",
-      "bucket": ["mybucket"],
-      "region": "us-east-1",
-      "endpoint": "http://localhost:9000",
-      "key": "minioadmin",
-      "secret": "minioadmin",
-      "insecure": true
-    },
-    {
-      "name": "sftp",
-      "type": "sftp",
-      "path": "/",
-      "key": "foo",
-      "secret": "pass",
-      "endpoint": "localhost:2222",
-      "insecure": true
-    }
+ {
+   "devices": [
+     { "name": "local", "type": "local", "path": "/home/user" },
+
+     // Windows: auto-detect drives, or specify drives explicitly
+     { "name": "local", "type": "local", "drives": ["C", "D", "E"] },
+
+     {
+       "name": "minio",
+       "type": "s3",
+       "bucket": ["mybucket"],
+       "region": "us-east-1",
+       "endpoint": "http://localhost:9000",
+       "key": "minioadmin",
+       "secret": "minioadmin",
+       "insecure": true
+     },
+     {
+       "name": "sftp",
+       "type": "sftp",
+       "path": "/",
+       "key": "foo",
+       "secret": "pass",
+       "endpoint": "localhost:2222",
+       "insecure": true
+     }
   ],
+
+  // win: name/C, name/D, ...
+  // minio: name/bucket_name
+  // unix: name
+  // sftp: name
   "left": "local",
   "right": "sftp"
 }
@@ -200,10 +209,12 @@ Example:
 |----------|-------------|---------|
 | name | Unique identifier | all |
 | type | local / s3 / fakefs | all |
+| disabled | Disable this device (optional) | all |
 | path | Local filesystem path | local, sftp |
-| bucket | S3 bucket name | s3 |
+| drives | Windows drive letters (auto-detected) | local (Windows) |
+| buckets | S3 bucket names (optional) | s3 |
 | region | AWS region (optional) | s3 |
-| prefix | Prefix inside bucket | s3 |
+| session | Session token (optional) | s3 |
 | key | Static access key | s3, sftp |
 | secret | Static secret key | s3, sftp |
 | endpoint | Custom S3 endpoint | s3, sftp |

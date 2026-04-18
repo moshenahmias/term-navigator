@@ -170,6 +170,11 @@ copilot <prompt>
        "insecure": true
      }
   ],
+
+  // win: name/C, name/D, ...
+  // minio: name/bucket_name
+  // unix: name
+  // sftp: name
   "left": "local",
   "right": "sftp"
 }
@@ -177,15 +182,16 @@ copilot <prompt>
 +----------------------+-----------------------------------------------+--------------------------+
 | Property             | Description                                   | Devices                  |
 +----------------------+-----------------------------------------------+--------------------------+
-| name                 | Unique identifier for the device              | local, s3, fakefs        |
-| type                 | Device type ("local", "s3", "fakefs")         | local, s3, fakefs        |
-| path                 | Local filesystem path                         | local                    |
-| drives               | Windows drive letters (auto-detected if empty)| local (Windows)           |
+| name                 | Unique identifier for the device              | all                      |
+| type                 | Device type ("local", "s3", "fakefs")         | all                      |
+| disabled             | Disable this device (optional)                | all                      |
+| path                 | Local filesystem path                         | local, sftp              |
+| drives               | Windows drive letters (auto-detected)         | local (Windows)          |
 | buckets              | S3 bucket names (optional)                    | s3                       |
 | region               | AWS region (optional)                         | s3                       |
+| session              | Session token (optional)                      | s3                       |
 | key                  | Static access key (optional)                  | s3, sftp                 |
 | secret               | Static secret key (optional)                  | s3, sftp                 |
-| session              | Session token (optional)                      | s3                       |
 | endpoint             | Custom S3-compatible endpoint                 | s3, sftp                 |
 | insecure             | Skip TLS verification (dev only)              | s3, sftp                 |
 | ca_file              | Path to custom CA bundle                      | s3, sftp                 |
