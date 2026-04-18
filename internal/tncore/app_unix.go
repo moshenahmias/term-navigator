@@ -89,12 +89,12 @@ func (a *App) renderHelpFooter() string {
 
 	footer := fmt.Sprintf(
 		"Edit %sson | Go %some | %sefresh | Switch to dev %s | Copy %sath | %sip",
-		footerKey(itemSelected && item.isEditable(), "[J]"),
-		footerKey(isLocal, "[H]"),
-		footerKey(true, "[R]"),
-		footerKey(len(a.orderedDevices) > 0, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
-		footerKey(itemSelected && !item.isParentDir(), "[P]"),
-		footerKey(isLocal && itemSelected && item.isArchivable(), "[Z]"),
+		footerKey(itemSelected && item.isEditable(), "J"),
+		footerKey(isLocal, "H"),
+		footerKey(true, "R"),
+		footerKey(len(a.orderedDevices) > 0, fmt.Sprintf("1-%d", min(9, len(a.orderedDevices)))),
+		footerKey(itemSelected && !item.isParentDir(), "P"),
+		footerKey(isLocal && itemSelected && item.isArchivable(), "Z"),
 	)
 
 	return renderFooter(a.width, footer)

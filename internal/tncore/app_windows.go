@@ -84,10 +84,10 @@ func (a *App) renderHelpFooter() string {
 
 	footer := fmt.Sprintf(
 		"Go %some | %sefresh | Copy %sath | %sip",
-		footerKey(isLocal, "[H]"),
-		footerKey(true, "[R]"),
-		footerKey(itemSelected && !item.isParentDir(), "[P]"),
-		footerKey(isLocal && itemSelected && item.isArchivable(), "[Z]"),
+		footerKey(isLocal, "H"),
+		footerKey(true, "R"),
+		footerKey(itemSelected && !item.isParentDir(), "P"),
+		footerKey(isLocal && itemSelected && item.isArchivable(), "Z"),
 	)
 
 	return renderFooter(a.width, footer)

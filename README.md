@@ -71,6 +71,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | Ctrl + A + H | Go Home |
 | Ctrl + A + R | Refresh |
 | Ctrl + A + P | Copy full path |
+| Ctrl + A + Z | Zip |
 | Ctrl + A + 1-9 | Quick switch to device by number (Unix/macOS only) |
 
 
