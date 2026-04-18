@@ -15,7 +15,7 @@ clean:
 	rm -rf bin/ dist/
 
 test:
-	go test ./cmd/termnav
+	go test ./...
 
 run:
 	./bin/termnav
@@ -60,9 +60,6 @@ dist-linux-386:
 		-C linux-386 termnav \
 		-C ../.. LICENSE
 
-dist-all: dist-macos-amd64 dist-macos-arm64 dist-linux-amd64 dist-linux-arm64 dist-linux-arm dist-linux-386 dist-windows-amd64 dist-windows-386
-	@echo "All distributions built."
-
 dist-windows-amd64:
 	mkdir -p dist/windows-amd64/
 	GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o dist/windows-amd64/termnav.exe ./cmd/termnav
@@ -72,3 +69,6 @@ dist-windows-386:
 	mkdir -p dist/windows-386/
 	GOOS=windows GOARCH=386 go build -ldflags "-X main.Version=$(VERSION)" -o dist/windows-386/termnav.exe ./cmd/termnav
 	cd dist && zip -j termnav-windows-386-$(VERSION).zip windows-386/termnav.exe ../LICENSE
+
+dist-all: dist-macos-amd64 dist-macos-arm64 dist-linux-amd64 dist-linux-arm64 dist-linux-arm dist-linux-386 dist-windows-amd64 dist-windows-386
+	@echo "All distributions built."
