@@ -519,6 +519,12 @@ func (a *App) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return a.copyPath()
 				}
 			}
+		case "ctrl+z": // zip
+			if a.ctrlActionActive() {
+				if item, b := active.SelectedItem(); b && !item.isParentDir() {
+					return a.runZip()
+				}
+			}
 		case "f4": // Edit / Extract
 			return a.runEdit(false)
 		case "f5":

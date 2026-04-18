@@ -61,18 +61,40 @@ func (a *App) runExtract() (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
+func (a *App) runZip() (tea.Model, tea.Cmd) {
+	pane := a.activePane()
+
+	if !isLocal(pane.explorer) {
+		return a, nil
+	}
+
+	item, ok := pane.SelectedItem()
+	if !ok {
+		return a, nil
+	}
+
+	parent := pane.explorer.Cwd(a.ctx)
+	filename := item.Info.Name
+	output := filename + ".zip"
+
+	pane.lastSelectedPath = item.Info.FullPath + ".zip"
+
+	return a, commands["exec"].f(a, "sh", "-c", "cd "+parent+" && zip -r "+output+" "+filename)
+}
+
 func (a *App) renderHelpFooter() string {
 	pane, _ := a.panes()
 	item, itemSelected := pane.SelectedItem()
 	isLocal := isLocal(pane.explorer)
 
 	footer := fmt.Sprintf(
-		"Edit %sson | Go %some | %sefresh | Switch to dev %s | Copy %sath",
+		"Edit %sson | Go %some | %sefresh | Switch to dev %s | Copy %sath | %sip",
 		footerKey(itemSelected && item.isEditable(), "[J]"),
 		footerKey(isLocal, "[H]"),
 		footerKey(true, "[R]"),
 		footerKey(len(a.orderedDevices) > 0, fmt.Sprintf("[1-%d]", min(9, len(a.orderedDevices)))),
 		footerKey(itemSelected && !item.isParentDir(), "[P]"),
+		footerKey(itemSelected && item.isArchivable(), "[Z]"),
 	)
 
 	return renderFooter(a.width, footer)

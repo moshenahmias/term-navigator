@@ -166,6 +166,10 @@ func (f *FileItem) isArchive() bool {
 	return true
 }
 
+func (f *FileItem) isArchivable() bool {
+	return !f.Info.IsSymlink && !f.isParentDir()
+}
+
 func (f *FileItem) TitleNoIcons() string {
 	name := f.Info.Name
 
