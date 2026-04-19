@@ -30,7 +30,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 ## ✨ Features
 
 - Dual‑pane navigation (like Midnight Commander)
-- Local filesystem + S3‑compatible backends
+- Local filesystem , S3‑compatible backends. SFTP
 - View, edit, copy, move, delete files
 - Extract archives
 - Metadata viewer
@@ -57,7 +57,7 @@ This installs the `termnav` binary into your system (`/usr/local/bin`), making i
 | F1 | Help |
 | F2 | Rename selected item |
 | F3 | View file |
-| F4 | Edit file or extract archive (Use Ctrl+E for edit + json beautify using jq) |
+| F4 | Edit file or extract archive |
 | F5 | Copy item to opposite pane |
 | F6 | Move item to opposite pane |
 | F7 | Create directory |
@@ -196,7 +196,7 @@ Example:
   ],
 
   // win: name/C, name/D, ...
-  // minio: name/bucket_name
+  // s3: name/bucket_name
   // unix: name
   // sftp: name
   "left": "local",

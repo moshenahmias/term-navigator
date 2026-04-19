@@ -173,7 +173,7 @@ copilot <prompt>
   ],
 
   // win: name/C, name/D, ...
-  // minio: name/bucket_name
+  // s3: name/bucket_name
   // unix: name
   // sftp: name
   "left": "local",
